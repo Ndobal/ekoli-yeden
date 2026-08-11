@@ -1,0 +1,119 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  // ---------------------------------------------------------------------
+  // EKOLI YEDEN DIGITAL HOME — API Worker
+  // "Preserving Our Past. Celebrating Our Present. Building Our Future."
+  //
+  // This Worker is the ONLY component permitted to touch D1 and R2.
+  // The Flutter Web client talks to this Worker over HTTPS and never
+  // holds Cloudflare credentials of any kind.
+  // ---------------------------------------------------------------------
+
+  "name": "ekoli-yeden-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  // Non-secret configuration only. Secrets live in `wrangler secret put`
+  // (remote) or `.dev.vars` (local, git-ignored). See docs/architecture.md.
+  "vars": {
+    "ENVIRONMENT": "development",
+    "API_VERSION": "1.0.0",
+    "SERVICE_NAME": "Ekoli Yeden Digital Home API",
+    "ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:5000,http://127.0.0.1:5000,http://localhost:8080",
+    "PUBLIC_MEDIA_BASE_URL": "http://localhost:8787/api/media/file",
+    "MAX_UPLOAD_BYTES": "26214400",
+    "ACCESS_TOKEN_TTL_SECONDS": "3600",
+    "REFRESH_TOKEN_TTL_SECONDS": "2592000"
+  },
+
+  // -------------------------------------------------------------------
+  // D1 — structured data (metadata, content, users, audit).
+  // Run `wrangler d1 create ekoli-yeden-db` and paste the id below.
+  // Migrations are kept at the repository root in /database/migrations
+  // so that the schema is versioned independently of the API code.
+  // -------------------------------------------------------------------
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ekoli-yeden-db",
+      "database_id": "8f234507-b1ca-4fd4-92c3-86c808069f06",
+      "migrations_dir": "../database/migrations"
+    }
+  ],
+
+  // -------------------------------------------------------------------
+  // R2 — binary files: images, audio, documents, avatars, heritage
+  // scans, language recordings and Leboku material.
+  // Videos are NOT stored here; YouTube is the video host.
+  // -------------------------------------------------------------------
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "ekoli-yeden-media"
+    }
+  ],
+
+  "env": {
+    "staging": {
+      "name": "ekoli-yeden-api-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "API_VERSION": "1.0.0",
+        "SERVICE_NAME": "Ekoli Yeden Digital Home API",
+        "ALLOWED_ORIGINS": "https://staging.ekoliyeden.pages.dev",
+        "PUBLIC_MEDIA_BASE_URL": "https://staging-api.ekoliyeden.org/api/media/file",
+        "MAX_UPLOAD_BYTES": "26214400",
+        "ACCESS_TOKEN_TTL_SECONDS": "3600",
+        "REFRESH_TOKEN_TTL_SECONDS": "2592000"
+      },
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ekoli-yeden-db-staging",
+          "database_id": "PLACEHOLDER_RUN_WRANGLER_D1_CREATE",
+          "migrations_dir": "../database/migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media-staging" }
+      ]
+    },
+
+    "production": {
+      "name": "ekoli-yeden-api",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "API_VERSION": "1.0.0",
+        "SERVICE_NAME": "Ekoli Yeden Digital Home API",
+        // The live site. Add the community's own domain here once it is
+        // pointed at Cloudflare Pages; an origin not listed gets no CORS
+        // headers and is blocked by the browser.
+        "ALLOWED_ORIGINS": "https://ekoli.pages.dev",
+        "PUBLIC_MEDIA_BASE_URL": "https://ekoli-yeden-api.ndovera.workers.dev/api/media/file",
+        "MAX_UPLOAD_BYTES": "26214400",
+        "ACCESS_TOKEN_TTL_SECONDS": "3600",
+        "REFRESH_TOKEN_TTL_SECONDS": "2592000"
+      },
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ekoli-yeden-db",
+          "database_id": "8f234507-b1ca-4fd4-92c3-86c808069f06",
+          "migrations_dir": "../database/migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media" }
+      ]
+    }
+  }
+}

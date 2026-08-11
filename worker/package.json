@@ -1,0 +1,30 @@
+{
+  "name": "ekoli-yeden-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Workers API layer for the Ekoli Yeden Digital Home",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:remote": "wrangler dev --remote",
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "dry-run": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply ekoli-yeden-db --local",
+    "db:migrate:staging": "wrangler d1 migrations apply ekoli-yeden-db --remote --env staging",
+    "db:migrate:production": "wrangler d1 migrations apply ekoli-yeden-db --remote --env production",
+    "db:list:local": "wrangler d1 migrations list ekoli-yeden-db --local",
+    "db:studio": "wrangler d1 execute ekoli-yeden-db --local --command \"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;\"",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.28.0"
+  }
+}

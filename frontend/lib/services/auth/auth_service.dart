@@ -1,0 +1,81 @@
+import '../../models/user.dart';
+import '../api/api_client.dart';
+import '../storage/token_storage.dart';
+
+/// Talks to the Worker's authentication endpoints.
+///
+/// This holds no authorisation logic of its own. It exchanges credentials for a
+/// session and reports what the server says the user may do; every one of those
+/// permissions is checked again by the Worker on every request.
+class AuthService {
+  AuthService(this._api);
+
+  final ApiClient _api;
+
+  Future<AppUser> login({required String email, required String password}) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/auth/login',
+      authenticated: false,
+      body: <String, dynamic>{'email': email, 'password': password},
+    );
+
+    await _saveSession(data);
+    return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
+  }
+
+  /// Creates a contributor account.
+  ///
+  /// A new account gets the Contributor role and nothing more: it may submit
+  /// material for review, and cannot publish anything.
+  Future<void> register({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async {
+    await _api.post(
+      '/api/auth/register',
+      authenticated: false,
+      body: <String, dynamic>{
+        'email': email,
+        'password': password,
+        'display_name': displayName,
+      },
+    );
+  }
+
+  /// The signed-in user, or `null` when there is no valid session.
+  Future<AppUser?> currentUser() async {
+    final TokenStorage storage = await TokenStorage.instance();
+    if (!storage.hasSession) return null;
+
+    try {
+      final Map<String, dynamic> data = await _api.get('/api/auth/me');
+      return AppUser.fromJson(data);
+    } catch (_) {
+      // A token that no longer resolves is not an error state to show — the
+      // session has simply ended, so clear it and continue as a visitor.
+      await storage.clear();
+      return null;
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await _api.post('/api/auth/logout');
+    } catch (_) {
+      // Even if the Worker cannot be reached, the local session must go —
+      // otherwise "sign out" would silently do nothing on a bad connection.
+    }
+    final TokenStorage storage = await TokenStorage.instance();
+    await storage.clear();
+  }
+
+  Future<void> _saveSession(Map<String, dynamic> data) async {
+    final TokenStorage storage = await TokenStorage.instance();
+    await storage.save(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+      expiresInSeconds: (data['expiresIn'] as num).toInt(),
+    );
+  }
+}

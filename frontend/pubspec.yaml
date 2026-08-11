@@ -1,0 +1,50 @@
+name: ekoli_yeden
+description: >-
+  EKOLI YEDEN DIGITAL HOME — a permanent digital home and archive for the
+  history, culture, language, people and festivals of Ekoli-Yeden.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Declarative routing with real URLs. The archive is meant to be linked to,
+  # bookmarked and indexed, so every section has its own path rather than
+  # living behind client-side navigation state.
+  go_router: ^14.6.2
+
+  # State management. Chosen over a code-generating solution so that the build
+  # stays a plain `flutter build web` with no generation step for a volunteer
+  # Technology Team member to remember.
+  provider: ^6.1.2
+
+  # HTTP client for the Cloudflare Worker API. This is the only way the client
+  # reaches data; it never holds a Cloudflare credential.
+  http: ^1.2.2
+
+  # Session tokens, stored in browser local storage on web.
+  shared_preferences: ^2.3.3
+
+  # Date and number formatting for events, festivals and news.
+  intl: ^0.19.0
+  flutter_web_plugins:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/

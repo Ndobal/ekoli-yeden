@@ -1,0 +1,42 @@
+import '../models/festival.dart';
+import '../services/api/api_client.dart';
+
+/// The festival archive.
+///
+/// `/leboku` lists the series and `/leboku/2026` opens one edition, so the
+/// public URLs read the way a visitor would expect and every past year stays
+/// reachable at a permanent address.
+class FestivalRepository {
+  const FestivalRepository(this._api);
+
+  final ApiClient _api;
+
+  /// Every edition of the Leboku series, newest first.
+  Future<List<FestivalEdition>> lebokuEditions() async {
+    final Map<String, dynamic> data = await _api.get('/api/leboku', authenticated: false);
+    final List<dynamic> raw = (data['editions'] as List<dynamic>?) ?? const <dynamic>[];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(FestivalEdition.fromJson)
+        .toList(growable: false);
+  }
+
+  /// One edition, with its events, gallery and videos in a single request.
+  ///
+  /// `identifier` may be a year (`2026`) or a slug (`leboku-2026`).
+  Future<FestivalDetail> festival(String identifier) async {
+    final bool isYear = RegExp(r'^\d{4}$').hasMatch(identifier);
+    final Map<String, dynamic> data = await _api.get(
+      isYear ? '/api/leboku/$identifier' : '/api/festivals/$identifier',
+      authenticated: false,
+    );
+    return FestivalDetail.fromJson(data);
+  }
+
+  /// All published festivals, for an index that is not Leboku-specific.
+  Future<List<Festival>> all() async {
+    final Map<String, dynamic> data = await _api.get('/api/festivals', authenticated: false);
+    final List<dynamic> raw = (data['items'] as List<dynamic>?) ?? const <dynamic>[];
+    return raw.whereType<Map<String, dynamic>>().map(Festival.fromJson).toList(growable: false);
+  }
+}

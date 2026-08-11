@@ -1,0 +1,66 @@
+# ---------------------------------------------------------------------------
+# EKOLI YEDEN DIGITAL HOME
+# ---------------------------------------------------------------------------
+
+# --- Secrets -----------------------------------------------------------------
+# Local Worker secrets. `.dev.vars.example` IS committed; `.dev.vars` never is.
+worker/.dev.vars
+worker/.dev.vars.*
+!worker/.dev.vars.example
+*.pem
+*.key
+secrets.json
+.env
+.env.*
+!.env.example
+
+# --- Node / Wrangler ---------------------------------------------------------
+node_modules/
+.wrangler/
+worker/worker-configuration.d.ts
+npm-debug.log*
+yarn-error.log*
+
+# --- Flutter / Dart ----------------------------------------------------------
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+**/*.g.dart
+**/*.freezed.dart
+
+# `pubspec.lock` IS committed for an application: everybody building this,
+# including CI, should resolve the same dependency versions.
+
+# --- Editors and OS ----------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Local database state ----------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+backup*.sql
+
+# --- Community photographs ---------------------------------------------------
+# Photographs of identifiable community members are NOT committed to this
+# repository, which is public. They belong in the archive itself, where each one
+# carries a recorded contributor, a usage permission and a moderation decision —
+# none of which a git repository can express or enforce.
+#
+# Upload them through the admin media library instead. See
+# docs/contribution-guidelines.md.
+Ekoli-yeden-elders/
+/*.jpg
+/*.jpeg
+/*.png
+!frontend/assets/**
+!frontend/web/**

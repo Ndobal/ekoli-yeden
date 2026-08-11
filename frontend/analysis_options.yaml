@@ -1,0 +1,29 @@
+include: package:flutter_lints/flutter.yaml
+
+# The analyzer runs clean as a condition of every commit. Rules added beyond
+# the Flutter defaults are the ones that keep a growing, volunteer-maintained
+# codebase readable.
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_empty_else
+    - avoid_unnecessary_containers
+    - prefer_const_constructors
+    - prefer_const_constructors_in_immutables
+    - prefer_const_declarations
+    - prefer_final_locals
+    - prefer_single_quotes
+    - sort_child_properties_last
+    - unnecessary_await_in_return
+    - unnecessary_lambdas
+    - use_super_parameters
+
+analyzer:
+  errors:
+    # An unused import or dead code is a defect, not a suggestion.
+    unused_import: error
+    unused_local_variable: error
+    dead_code: error
+  exclude:
+    - build/**
+    - '**/*.g.dart'

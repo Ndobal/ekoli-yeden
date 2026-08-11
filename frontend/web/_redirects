@@ -1,0 +1,10 @@
+# Single-page-application fallback for Cloudflare Pages.
+#
+# The archive uses clean URLs — /history/…, /leboku/2026, /language — so that a
+# link shared on WhatsApp or printed as a QR code resolves directly, and so
+# search engines can index each section at its own address.
+#
+# Without this rule, requesting any path other than / would return a 404: those
+# paths exist only inside the Flutter router, not as files on disk. The 200
+# status (rather than a redirect) is what preserves the URL in the address bar.
+/*    /index.html   200

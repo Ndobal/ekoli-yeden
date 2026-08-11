@@ -1,0 +1,19 @@
+# Local development secrets for the Worker.
+#
+# Copy this file to `.dev.vars` and fill in real values. `.dev.vars` is
+# git-ignored and must never be committed.
+#
+# In staging and production these are Cloudflare secrets, set with:
+#   wrangler secret put JWT_SECRET --env production
+#
+# None of these values ever reach the Flutter client. The browser bundle is
+# downloaded by every visitor; anything in it is public by definition.
+
+# Signs and verifies session tokens. At least 32 characters.
+# Generate one with:  openssl rand -base64 48
+JWT_SECRET=replace-me-with-at-least-32-random-characters-before-use
+
+# Optional. Used only by an administrator adding a video, to pre-fill title and
+# description from the YouTube Data API. The archive works fully without it —
+# thumbnails are derived from the video id, so no key is needed to render pages.
+YOUTUBE_API_KEY=
