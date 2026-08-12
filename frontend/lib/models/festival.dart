@@ -13,6 +13,9 @@ class Festival {
     required this.name,
     required this.year,
     required this.status,
+    this.fullName,
+    this.tagline,
+    this.logoUrl,
     this.theme,
     this.description,
     this.startDate,
@@ -25,6 +28,7 @@ class Festival {
     this.coverMediaId,
     this.galleryId,
     this.isArchived = false,
+    this.isFeatured = false,
   });
 
   factory Festival.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,9 @@ class Festival {
       name: Json.str(json, 'name', fallback: 'Festival'),
       year: Json.intVal(json, 'year'),
       status: Json.str(json, 'status'),
+      fullName: Json.strOrNull(json, 'full_name'),
+      tagline: Json.strOrNull(json, 'tagline'),
+      logoUrl: Json.strOrNull(json, 'logo_url'),
       theme: Json.strOrNull(json, 'theme'),
       description: Json.strOrNull(json, 'description'),
       startDate: Json.strOrNull(json, 'start_date'),
@@ -47,14 +54,29 @@ class Festival {
       coverMediaId: Json.strOrNull(json, 'cover_media_id'),
       galleryId: Json.strOrNull(json, 'gallery_id'),
       isArchived: Json.boolVal(json, 'is_archived'),
+      isFeatured: Json.boolVal(json, 'is_featured'),
     );
   }
 
   final String id;
   final String slug;
+
+  /// The short name people use — "Leboku".
   final String name;
+
   final int year;
   final String status;
+
+  /// The full ceremonial name where it differs — "Lekoli Boku New Yam Festival".
+  final String? fullName;
+
+  /// The line carried on the festival's own materials.
+  final String? tagline;
+
+  /// The festival's own logo, resolved by the Worker. Null until one is
+  /// uploaded, in which case the page draws a branded panel instead.
+  final String? logoUrl;
+
   final String? theme;
   final String? description;
   final String? startDate;
@@ -67,6 +89,9 @@ class Festival {
   final String? coverMediaId;
   final String? galleryId;
   final bool isArchived;
+
+  /// The edition the site gives prominence to.
+  final bool isFeatured;
 
   String get displayName => '$name $year';
 
@@ -86,14 +111,60 @@ class Festival {
   }
 }
 
+/// The festivals index: the one to feature, and the rest.
+///
+/// Which edition is featured is decided by the server — whichever the Editorial
+/// Team flagged, falling back to the most recent unarchived one — so the client
+/// makes no assumption about which festival matters.
+class FestivalIndex {
+  const FestivalIndex({required this.featured, required this.past, required this.total});
+
+  factory FestivalIndex.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic>? featured = json['featured'] as Map<String, dynamic>?;
+    return FestivalIndex(
+      featured: featured == null ? null : Festival.fromJson(featured),
+      past: Json.objectList(json, 'past').map(Festival.fromJson).toList(growable: false),
+      total: Json.intVal(json, 'total'),
+    );
+  }
+
+  final Festival? featured;
+  final List<Festival> past;
+  final int total;
+
+  bool get isEmpty => featured == null && past.isEmpty;
+}
+
+/// One phase of a festival's programme.
+///
+/// A festival is not a single day: there is a run-up, the main day, and
+/// activities afterwards. Keeping the phase means the programme reads as a
+/// sequence rather than an undifferentiated list.
+class ProgrammePhase {
+  const ProgrammePhase({required this.phase, required this.items});
+
+  factory ProgrammePhase.fromJson(Map<String, dynamic> json) {
+    return ProgrammePhase(
+      phase: Json.str(json, 'phase', fallback: 'other'),
+      items: Json.objectList(json, 'items').map(ContentRecord.fromJson).toList(growable: false),
+    );
+  }
+
+  /// `lead_up`, `main_day`, `after` or `other`.
+  final String phase;
+
+  final List<ContentRecord> items;
+}
+
 /// A festival together with everything attached to it.
 ///
 /// One request renders a whole festival page: the edition, its programme
-/// events, its photographs and its videos.
+/// grouped by phase, its photographs and its videos.
 class FestivalDetail {
   const FestivalDetail({
     required this.festival,
     required this.events,
+    required this.programme,
     required this.videos,
     required this.gallery,
   });
@@ -102,6 +173,9 @@ class FestivalDetail {
     return FestivalDetail(
       festival: Festival.fromJson((json['festival'] as Map<String, dynamic>?) ?? <String, dynamic>{}),
       events: Json.objectList(json, 'events').map(ContentRecord.fromJson).toList(growable: false),
+      programme: Json.objectList(json, 'programme')
+          .map(ProgrammePhase.fromJson)
+          .toList(growable: false),
       videos: Json.objectList(json, 'videos').map(Video.fromJson).toList(growable: false),
       gallery: Json.objectList(json, 'gallery'),
     );
@@ -109,12 +183,17 @@ class FestivalDetail {
 
   final Festival festival;
   final List<ContentRecord> events;
+
+  /// The programme, already grouped and ordered by the Worker.
+  final List<ProgrammePhase> programme;
+
   final List<Video> videos;
 
   /// Gallery items already joined to their media URLs by the Worker.
   final List<Map<String, dynamic>> gallery;
 
-  bool get hasContent => events.isNotEmpty || videos.isNotEmpty || gallery.isNotEmpty;
+  bool get hasContent =>
+      events.isNotEmpty || videos.isNotEmpty || gallery.isNotEmpty || programme.isNotEmpty;
 }
 
 /// A single year in the festival series, as listed on `/leboku`.

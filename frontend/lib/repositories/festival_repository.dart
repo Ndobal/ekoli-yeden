@@ -21,9 +21,10 @@ class FestivalRepository {
         .toList(growable: false);
   }
 
-  /// One edition, with its events, gallery and videos in a single request.
+  /// One edition, with its programme, gallery and videos in a single request.
   ///
-  /// `identifier` may be a year (`2026`) or a slug (`leboku-2026`).
+  /// `identifier` may be a year (`2026`) or a slug (`leboku-2026`), so links
+  /// printed on earlier festival materials keep resolving.
   Future<FestivalDetail> festival(String identifier) async {
     final bool isYear = RegExp(r'^\d{4}$').hasMatch(identifier);
     final Map<String, dynamic> data = await _api.get(
@@ -33,7 +34,13 @@ class FestivalRepository {
     return FestivalDetail.fromJson(data);
   }
 
-  /// All published festivals, for an index that is not Leboku-specific.
+  /// The festivals index: the featured edition and the earlier ones.
+  Future<FestivalIndex> index() async {
+    final Map<String, dynamic> data = await _api.get('/api/festivals', authenticated: false);
+    return FestivalIndex.fromJson(data);
+  }
+
+  /// Every published festival as a flat list.
   Future<List<Festival>> all() async {
     final Map<String, dynamic> data = await _api.get('/api/festivals', authenticated: false);
     final List<dynamic> raw = (data['items'] as List<dynamic>?) ?? const <dynamic>[];

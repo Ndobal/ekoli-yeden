@@ -21,14 +21,34 @@ import { publicMediaUrl } from '../utils/files';
 
 const FESTIVAL_RESOURCE = requireResource('festivals');
 
-/** `GET /api/festivals` — every published festival, newest year first. */
+/**
+ * `GET /api/festivals`
+ *
+ * Every published festival, newest first, split into the one to feature and
+ * the rest. Leboku is the largest of the community's festivals but not the
+ * only one, so the endpoint makes no assumption about which is which — the
+ * featured edition is whichever the Editorial Team flagged, falling back to
+ * the most recent that has not been archived.
+ */
 export async function listFestivals(context: RequestContext): Promise<Response> {
   const service = new ContentService(context.env.DB, FESTIVAL_RESOURCE);
   const query = service.buildQuery(context.query, false);
   const { items, total } = await service.list(query);
 
+  const decorated = await Promise.all(
+    items.map((row) => decorateFestival(context, parseFestivalJson(row))),
+  );
+
+  const featured =
+    decorated.find((row) => row['is_featured'] === 1) ??
+    decorated.find((row) => row['is_archived'] !== 1) ??
+    decorated[0] ??
+    null;
+
+  const rest = decorated.filter((row) => row !== featured);
+
   return json(
-    { items: items.map(parseFestivalJson), total },
+    { featured, past: rest, items: decorated, total },
     { headers: publicCacheHeaders() },
   );
 }
@@ -52,13 +72,61 @@ export async function showFestival(context: RequestContext): Promise<Response> {
 
   return json(
     {
-      festival: parseFestivalJson(festival),
+      festival: await decorateFestival(context, parseFestivalJson(festival)),
       events,
+      // The programme, grouped the way a festival actually runs: the run-up,
+      // the main day, and what follows. A festival is not a single date, and a
+      // flat list of activities loses the shape of it.
+      programme: groupProgramme(events),
       videos,
       gallery: galleryItems,
     },
     { headers: publicCacheHeaders() },
   );
+}
+
+/** Phases in the order they occur. */
+const PROGRAMME_PHASES = ['lead_up', 'main_day', 'after', 'other'] as const;
+
+function groupProgramme(events: Record<string, unknown>[]): Record<string, unknown>[] {
+  return PROGRAMME_PHASES.map((phase) => ({
+    phase,
+    items: events
+      .filter((event) => (event['festival_phase'] ?? 'other') === phase)
+      .sort((a, b) => {
+        // Order by explicit position first, then by date where one is known.
+        const order = Number(a['sort_order'] ?? 0) - Number(b['sort_order'] ?? 0);
+        if (order !== 0) return order;
+        const left = String(a['start_datetime'] ?? '');
+        const right = String(b['start_datetime'] ?? '');
+        return left.localeCompare(right);
+      }),
+  })).filter((group) => group.items.length > 0);
+}
+
+/** Resolves the festival's own logo to a URL the client can render. */
+async function decorateFestival(
+  context: RequestContext,
+  festival: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const logoId = festival['logo_media_id'];
+  if (typeof logoId !== 'string' || logoId === '') {
+    return { ...festival, logo_url: null };
+  }
+
+  const media = await context.env.DB.prepare(
+    'SELECT "storage_key", "status" FROM "media_assets" WHERE "id" = ? LIMIT 1',
+  )
+    .bind(logoId)
+    .first<{ storage_key: string; status: string }>();
+
+  return {
+    ...festival,
+    logo_url:
+      media && media.status === CONTENT_STATUS.PUBLISHED
+        ? publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, media.storage_key)
+        : null,
+  };
 }
 
 /**
@@ -139,7 +207,9 @@ async function loadEvents(db: D1Database, festivalId: string): Promise<Record<st
   const { items } = await listRecords<Record<string, unknown>>(db, 'events', {
     status: PUBLIC_STATUSES,
     filters: { festival_id: festivalId },
-    sortColumn: 'start_datetime',
+    // Ordered by position rather than date: a programme is usually planned
+    // before its dates are fixed, and an unfixed date must not scatter it.
+    sortColumn: 'sort_order',
     sortDirection: 'ASC',
     limit: 200,
     offset: 0,

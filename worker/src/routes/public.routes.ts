@@ -28,6 +28,9 @@ const GENERATED_KEYS = [
   'pages',
   'history',
   'culture',
+  'age-grades',
+  'cultural-groups',
+  'music',
   'leaders',
   'people',
   'news',
@@ -143,7 +146,12 @@ export const publicRoutes: RouteDefinition[] = [
   },
 
   // --- Festivals and Leboku ------------------------------------------------
-  { method: 'GET', path: '/api/festivals', handler: listFestivals, description: 'All published festivals' },
+  {
+    method: 'GET',
+    path: '/api/festivals',
+    handler: listFestivals,
+    description: 'All published festivals, with the featured edition separated out',
+  },
   {
     method: 'GET',
     path: '/api/festivals/:identifier',

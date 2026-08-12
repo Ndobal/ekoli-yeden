@@ -186,13 +186,14 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     label: 'Festival',
     slugColumn: 'slug',
     writableColumns: [
-      'slug', 'name', 'year', 'theme', 'description', 'start_date', 'end_date',
-      'location', 'programme', 'sponsors', 'announcements', 'committee',
-      'cover_media_id', 'gallery_id', 'is_archived',
+      'slug', 'name', 'full_name', 'year', 'theme', 'tagline', 'description',
+      'start_date', 'end_date', 'location', 'programme', 'sponsors',
+      'announcements', 'committee', 'cover_media_id', 'logo_media_id',
+      'gallery_id', 'is_archived', 'is_featured',
       'seo_title', 'seo_description', 'seo_image_media_id', 'status',
     ],
     publicColumns: null,
-    searchableColumns: ['name', 'theme', 'description', 'location'],
+    searchableColumns: ['name', 'full_name', 'theme', 'tagline', 'description', 'location'],
     sortableColumns: ['year', 'name', 'start_date', ...AUDIT_COLUMNS],
     defaultSort: 'year',
     defaultOrder: 'DESC',
@@ -340,6 +341,69 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     hasVerification: true,
     searchable: true,
     fixedFilters: { content_type: 'culture' },
+  },
+
+  // Age grades, cultural groups and cultural music. Like `culture`, these share
+  // the `content_items` table and are discriminated by `content_type` — three
+  // more shelves in the same cupboard rather than three new tables.
+  'age-grades': {
+    key: 'age-grades',
+    table: 'content_items',
+    label: 'Age grade',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'cover_media_id',
+      'seo_title', 'seo_description', 'sort_order', 'verification_status', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'subtitle', 'excerpt', 'body'],
+    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
+    managedBy: HERITAGE,
+    hasVerification: true,
+    searchable: true,
+    fixedFilters: { content_type: 'age_grades' },
+  },
+
+  'cultural-groups': {
+    key: 'cultural-groups',
+    table: 'content_items',
+    label: 'Cultural group',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'cover_media_id',
+      'seo_title', 'seo_description', 'sort_order', 'verification_status', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'subtitle', 'excerpt', 'body'],
+    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
+    managedBy: HERITAGE,
+    hasVerification: true,
+    searchable: true,
+    fixedFilters: { content_type: 'cultural_groups' },
+  },
+
+  music: {
+    key: 'music',
+    table: 'content_items',
+    label: 'Cultural music',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'cover_media_id',
+      'seo_title', 'seo_description', 'sort_order', 'verification_status', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'subtitle', 'excerpt', 'body'],
+    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
+    managedBy: HERITAGE,
+    hasVerification: true,
+    searchable: true,
+    fixedFilters: { content_type: 'cultural_music' },
   },
 
   community: {

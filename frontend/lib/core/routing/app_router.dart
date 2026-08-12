@@ -5,6 +5,7 @@ import '../../features/about/about_pages.dart';
 import '../../features/auth/auth_pages.dart';
 import '../../features/businesses/directory_pages.dart';
 import '../../features/contributions/contribute_page.dart';
+import '../../features/culture/cultural_life_pages.dart';
 import '../../features/culture/culture_pages.dart';
 import '../../features/editorial/editorial_dashboard.dart';
 import '../../features/editorial/editorial_text_page.dart';
@@ -14,7 +15,7 @@ import '../../features/history/history_pages.dart';
 import '../../features/home/home_page.dart';
 import '../../features/language/language_pages.dart';
 import '../../features/leadership/leadership_pages.dart';
-import '../../features/leboku/leboku_pages.dart';
+import '../../features/leboku/festival_pages.dart';
 import '../../features/news/news_pages.dart';
 import '../../features/people/people_pages.dart';
 import '../../features/search/search_page.dart';
@@ -115,15 +116,60 @@ GoRouter buildRouter(AuthController auth) {
         ],
       ),
       GoRoute(path: AppRoutes.language, builder: (_, _) => const LanguageListPage()),
+
+      // --- Festivals -------------------------------------------------------
+      // `/festivals` is canonical. `/leboku` and `/leboku/<year>` still resolve
+      // so that links already printed on festival materials keep working — a
+      // permanent archive should not break its own addresses.
       GoRoute(
-        path: AppRoutes.leboku,
-        builder: (_, _) => const LebokuIndexPage(),
+        path: AppRoutes.festivals,
+        builder: (_, _) => const FestivalsIndexPage(),
         routes: <RouteBase>[
-          // `/leboku/2026`, `/leboku/2027`, and every year after.
           GoRoute(
-            path: ':year',
+            path: ':slug',
             builder: (_, GoRouterState state) =>
-                FestivalYearPage(year: state.pathParameters['year']!),
+                FestivalDetailPage(identifier: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+      GoRoute(path: AppRoutes.leboku, redirect: (_, _) => AppRoutes.festivals),
+      GoRoute(
+        path: '${AppRoutes.leboku}/:year',
+        builder: (_, GoRouterState state) =>
+            FestivalDetailPage(identifier: state.pathParameters['year']!),
+      ),
+
+      // --- Cultural life ---------------------------------------------------
+      GoRoute(
+        path: AppRoutes.ageGrades,
+        builder: (_, _) => const AgeGradesListPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                AgeGradeDetailPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.culturalGroups,
+        builder: (_, _) => const CulturalGroupsListPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                CulturalGroupDetailPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.music,
+        builder: (_, _) => const CulturalMusicListPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                CulturalMusicDetailPage(slug: state.pathParameters['slug']!),
           ),
         ],
       ),

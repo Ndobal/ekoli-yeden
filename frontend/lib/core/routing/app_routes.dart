@@ -12,7 +12,17 @@ class AppRoutes {
   static const String history = '/history';
   static const String culture = '/culture';
   static const String language = '/language';
+
+  /// The canonical festivals section. Leboku is the largest of the community's
+  /// festivals, not the only one, so the section is general.
+  static const String festivals = '/festivals';
+
+  /// Kept working so links printed on earlier festival materials still resolve.
   static const String leboku = '/leboku';
+
+  static const String ageGrades = '/age-grades';
+  static const String culturalGroups = '/cultural-groups';
+  static const String music = '/music';
   static const String people = '/people';
   static const String leaders = '/leaders';
   static const String news = '/news';
@@ -83,8 +93,16 @@ class AppRoutes {
   static String project(String slug) => '$community/$slug';
   static String languageEntry(String id) => '$language/$id';
 
-  /// `/leboku/2026`, `/leboku/2027`, and every year thereafter.
+  /// A festival by slug — `/festivals/leboku-2026`.
+  static String festival(String slug) => '$festivals/$slug';
+
+  /// `/leboku/2026`, `/leboku/2027`, and every year thereafter. Retained for
+  /// links already in circulation.
   static String festivalYear(int year) => '$leboku/$year';
+
+  static String ageGrade(String slug) => '$ageGrades/$slug';
+  static String culturalGroup(String slug) => '$culturalGroups/$slug';
+  static String musicEntry(String slug) => '$music/$slug';
 
   static String searchFor(String query) => '$search?q=${Uri.encodeQueryComponent(query)}';
 
@@ -153,7 +171,11 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
   NavItem(label: 'History', path: AppRoutes.history, description: 'Our history and heritage'),
   NavItem(label: 'Culture', path: AppRoutes.culture, description: 'Traditions and community life'),
   NavItem(label: 'Language', path: AppRoutes.language, description: 'Learn the Ekoli language'),
-  NavItem(label: 'Leboku', path: AppRoutes.leboku, description: 'The Leboku festival, year by year'),
+  NavItem(
+    label: 'Festivals',
+    path: AppRoutes.festivals,
+    description: 'Lekoli Boku and the festivals of Ekoli-Yeden',
+  ),
   NavItem(label: 'People', path: AppRoutes.people, description: 'People of Ekoli-Yeden'),
   NavItem(label: 'News', path: AppRoutes.news, description: 'Community news and announcements'),
   NavItem(label: 'Gallery', path: AppRoutes.gallery, description: 'Photographs from the archive'),
@@ -163,6 +185,9 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
 ];
 
 const List<NavItem> fallbackFooterNavigation = <NavItem>[
+  NavItem(label: 'Age grades', path: AppRoutes.ageGrades),
+  NavItem(label: 'Cultural groups', path: AppRoutes.culturalGroups),
+  NavItem(label: 'Cultural music', path: AppRoutes.music),
   NavItem(label: 'Events', path: AppRoutes.events),
   NavItem(label: 'Businesses', path: AppRoutes.businesses),
   NavItem(label: 'Organizations', path: AppRoutes.organizations),
