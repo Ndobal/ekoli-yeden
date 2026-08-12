@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../../repositories/account_repository.dart';
 import '../../repositories/admin_repository.dart';
 import '../../repositories/cms_repository.dart';
 import '../../repositories/content_repository.dart';
@@ -49,6 +50,7 @@ class ServiceLocator {
       Provider<MediaRepository>(create: (_) => MediaRepository(api)),
       Provider<SubmissionRepository>(create: (_) => SubmissionRepository(api)),
       Provider<AdminRepository>(create: (_) => AdminRepository(api)),
+      Provider<AccountRepository>(create: (_) => AccountRepository(api)),
 
       // Content repositories are constructed on demand by `contentRepository`
       // below rather than registered one by one: there are fourteen of them and

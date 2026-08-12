@@ -28,6 +28,7 @@
     "SERVICE_NAME": "Ekoli Yeden Digital Home API",
     "ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:5000,http://127.0.0.1:5000,http://localhost:8080",
     "PUBLIC_MEDIA_BASE_URL": "http://localhost:8787/api/media/file",
+    "SITE_URL": "http://localhost:5000",
     "MAX_UPLOAD_BYTES": "26214400",
     "ACCESS_TOKEN_TTL_SECONDS": "3600",
     "REFRESH_TOKEN_TTL_SECONDS": "2592000"
@@ -57,6 +58,15 @@
     {
       "binding": "MEDIA",
       "bucket_name": "ekoli-yeden-media"
+    },
+    {
+      // Material contributed by the community, before anybody has reviewed it.
+      // A separate bucket rather than a folder: unreviewed material and the
+      // published archive have different audiences and different risk, and a
+      // bucket boundary means a mistake in the media-serving path cannot
+      // expose something nobody has checked.
+      "binding": "SUBMISSIONS",
+      "bucket_name": "ekoli-yeden-submissions"
     }
   ],
 
@@ -69,6 +79,7 @@
         "SERVICE_NAME": "Ekoli Yeden Digital Home API",
         "ALLOWED_ORIGINS": "https://staging.ekoliyeden.pages.dev",
         "PUBLIC_MEDIA_BASE_URL": "https://staging-api.ekoliyeden.org/api/media/file",
+        "SITE_URL": "https://staging.ekoliyeden.pages.dev",
         "MAX_UPLOAD_BYTES": "26214400",
         "ACCESS_TOKEN_TTL_SECONDS": "3600",
         "REFRESH_TOKEN_TTL_SECONDS": "2592000"
@@ -83,7 +94,8 @@
         }
       ],
       "r2_buckets": [
-        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media-staging" }
+        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media-staging" },
+        { "binding": "SUBMISSIONS", "bucket_name": "ekoli-yeden-submissions-staging" }
       ]
     },
 
@@ -98,6 +110,7 @@
         // headers and is blocked by the browser.
         "ALLOWED_ORIGINS": "https://ekoli.pages.dev",
         "PUBLIC_MEDIA_BASE_URL": "https://ekoli-yeden-api.ndovera.workers.dev/api/media/file",
+        "SITE_URL": "https://ekoli.pages.dev",
         "MAX_UPLOAD_BYTES": "26214400",
         "ACCESS_TOKEN_TTL_SECONDS": "3600",
         "REFRESH_TOKEN_TTL_SECONDS": "2592000"
@@ -112,7 +125,8 @@
         }
       ],
       "r2_buckets": [
-        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media" }
+        { "binding": "MEDIA", "bucket_name": "ekoli-yeden-media" },
+        { "binding": "SUBMISSIONS", "bucket_name": "ekoli-yeden-submissions" }
       ]
     }
   }

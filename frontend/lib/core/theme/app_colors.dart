@@ -172,8 +172,40 @@ class BrandAssets {
   /// The logo on a transparent background — the default everywhere.
   static const String logo = 'assets/images/branding/ekoli_yeden_logo.png';
 
+  /// A 128px copy for the header and other small renders.
+  ///
+  /// The full asset is ~350 KB. Most visitors arrive from a WhatsApp link on a
+  /// phone, often on a slow connection, and the header logo appears on every
+  /// page — so anything rendered below ~64px uses this instead.
+  static const String logoSmall = 'assets/images/branding/ekoli_yeden_logo_small.png';
+
   /// The logo on its own background, for surfaces where transparency would
   /// leave the mark sitting on an unsuitable colour.
   static const String logoWithBackground =
       'assets/images/branding/ekoli_yeden_logo_background.png';
+}
+
+/// Colours for text placed on the navy footer and other dark brand surfaces.
+///
+/// These exist because the theme's own text styles carry dark foreground
+/// colours intended for light surfaces. Applying `bodySmall` unchanged on the
+/// navy footer produced dark-grey text on dark navy — legible to nobody. Every
+/// dark-surface text colour is therefore named here and stated explicitly.
+class OnDark {
+  const OnDark._();
+
+  /// Headings and anything that must read strongly. ~12.6:1 on navy.
+  static const Color primary = Color(0xFFFFFFFF);
+
+  /// Body copy on navy. ~9.4:1 — comfortably past AA for body text.
+  static const Color body = Color(0xFFDCE7F2);
+
+  /// Secondary text: captions, the copyright line. ~6.8:1, still past AA.
+  static const Color muted = Color(0xFFA9BFD4);
+
+  /// Links and accents on navy. ~8.9:1.
+  static const Color link = AppColors.skyBlue;
+
+  /// Hairlines and dividers. Not text, so contrast is not the measure.
+  static const Color divider = Color(0x33FFFFFF);
 }

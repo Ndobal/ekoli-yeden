@@ -40,6 +40,9 @@ class AppRoutes {
   // --- Account --------------------------------------------------------------
   static const String signIn = '/sign-in';
   static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
+  static const String account = '/account';
 
   // --- Editorial ------------------------------------------------------------
   // The Editorial Team's own area. Separate from /admin by design: an editorial
@@ -63,6 +66,7 @@ class AppRoutes {
   static const String editorialSources = '/editorial/sources';
   static const String editorialContributors = '/editorial/contributors';
   static const String editorialMedia = '/editorial/media';
+  static const String editorialContributions = '/editorial/contributions';
 
   // --- Super Admin ----------------------------------------------------------
   static const String admin = '/admin';
@@ -77,6 +81,7 @@ class AppRoutes {
   static const String adminAuditLogs = '/admin/audit-logs';
   static const String adminSecurity = '/admin/security';
   static const String adminSettings = '/admin/settings';
+  static const String adminContributions = '/admin/contributions';
 
   // --- Builders for parameterised paths -------------------------------------
 
@@ -142,7 +147,7 @@ class AppRoutes {
       case 'language':
         return languageEntry(segment);
       case 'festivals':
-        return '$leboku/$segment';
+        return festival(segment);
       case 'pages':
         return '/$segment';
       default:
@@ -215,6 +220,11 @@ const List<NavItem> editorialNavigation = <NavItem>[
   NavItem(label: 'Community', path: AppRoutes.editorialCommunity),
   NavItem(label: 'Media library', path: AppRoutes.editorialMedia, description: 'Upload photographs, audio and documents'),
   NavItem(label: 'Submissions', path: AppRoutes.editorialSubmissions, description: 'What the community has sent in'),
+  NavItem(
+    label: 'Contributed files',
+    path: AppRoutes.editorialContributions,
+    description: 'Photographs and documents awaiting review',
+  ),
   NavItem(label: 'Sources', path: AppRoutes.editorialSources, description: 'The citation library'),
 ];
 
@@ -243,6 +253,11 @@ const List<NavItem> adminNavigation = <NavItem>[
   NavItem(label: 'Editorial Team', path: AppRoutes.adminEditorialTeam),
   NavItem(label: 'Content', path: AppRoutes.adminContent),
   NavItem(label: 'Submissions', path: AppRoutes.adminSubmissions),
+  NavItem(
+    label: 'Contributed files',
+    path: AppRoutes.adminContributions,
+    description: 'Files awaiting review',
+  ),
   NavItem(label: 'Media library', path: AppRoutes.adminMedia),
   NavItem(label: 'Sources', path: AppRoutes.adminSources),
   NavItem(label: 'Audit logs', path: AppRoutes.adminAuditLogs),

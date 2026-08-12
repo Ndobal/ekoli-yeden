@@ -1,38 +1,206 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <base href="$FLUTTER_BASE_HREF">
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <!--
+    WHY THIS HEAD MATTERS MORE THAN USUAL
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="ekoli_yeden">
+    Flutter Web renders into a canvas. Google's crawler will execute the app and
+    eventually see it, but Facebook, WhatsApp, X, LinkedIn and Slack will not —
+    they read this file, take what is in <head>, and stop. Whatever is here is
+    the entire preview a link produces when somebody shares the archive.
+
+    These tags are the defaults for the site as a whole. Per-page values are
+    substituted at the edge by functions/_middleware.js, which rewrites the
+    marked tags below using the real title and description of whatever page was
+    requested. Keep the id attributes — the rewriter targets them.
+  -->
+
+  <title id="page-title">Ekoli Yeden Digital Home — Preserving Our Past. Celebrating Our Present. Building Our Future.</title>
+  <meta id="page-description" name="description" content="The permanent digital home and heritage archive of Ekoli-Yeden: its history, culture, language, leadership, people, festivals and community life — preserved, verified and open to all.">
+  <link id="page-canonical" rel="canonical" href="https://ekoli.pages.dev/">
+
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="googlebot" content="index, follow">
+  <meta name="author" content="Ekoli-Yeden Preservation Team">
+  <meta name="keywords" content="Ekoli-Yeden, Ekori, Ekoli, Yakurr, Cross River State, Nigeria, Lekoli Boku, Leboku, New Yam Festival, Lokaa language, African heritage archive, community history">
+
+  <!-- Open Graph: Facebook, WhatsApp, LinkedIn -->
+  <meta property="og:site_name" content="Ekoli Yeden Digital Home">
+  <meta property="og:locale" content="en_NG">
+  <meta id="og-type" property="og:type" content="website">
+  <meta id="og-title" property="og:title" content="Ekoli Yeden Digital Home">
+  <meta id="og-description" property="og:description" content="The permanent digital home and heritage archive of Ekoli-Yeden: its history, culture, language, leadership, people, festivals and community life.">
+  <meta id="og-url" property="og:url" content="https://ekoli.pages.dev/">
+  <meta id="og-image" property="og:image" content="https://ekoli.pages.dev/social-card.png">
+  <meta property="og:image:secure_url" content="https://ekoli.pages.dev/social-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The Ekoli Yeden Digital Home — Preserving Our Past. Celebrating Our Present. Building Our Future.">
+
+  <!-- X / Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta id="twitter-title" name="twitter:title" content="Ekoli Yeden Digital Home">
+  <meta id="twitter-description" name="twitter:description" content="The permanent digital home and heritage archive of Ekoli-Yeden.">
+  <meta id="twitter-image" name="twitter:image" content="https://ekoli.pages.dev/social-card.png">
+  <meta name="twitter:image:alt" content="The Ekoli Yeden Digital Home logo and tagline.">
+
+  <!-- Appearance -->
+  <meta name="theme-color" content="#0A345C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ekoli Yeden">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>ekoli_yeden</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
+
+  <!-- The API is on another origin and is contacted on first paint. -->
+  <link rel="preconnect" href="https://ekoli-yeden-api.ndovera.workers.dev" crossorigin>
+  <link rel="dns-prefetch" href="https://ekoli-yeden-api.ndovera.workers.dev">
+
+  <!--
+    Structured data. This is how a search engine learns that the site is an
+    archive belonging to an organisation, rather than a generic page, and it is
+    what can produce a richer result with the logo and a search box.
+  -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://ekoli.pages.dev/#organization",
+        "name": "Ekoli Yeden Digital Home",
+        "alternateName": ["Ekoli-Yeden", "Ekori"],
+        "url": "https://ekoli.pages.dev/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://ekoli.pages.dev/icons/Icon-512.png",
+          "width": 512,
+          "height": 512
+        },
+        "image": "https://ekoli.pages.dev/social-card.png",
+        "slogan": "Preserving Our Past. Celebrating Our Present. Building Our Future.",
+        "description": "The permanent digital home and heritage archive of Ekoli-Yeden, preserving its history, culture, language, leadership, people and festivals.",
+        "areaServed": {
+          "@type": "Place",
+          "name": "Ekori, Yakurr Local Government Area, Cross River State, Nigeria"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://ekoli.pages.dev/#website",
+        "url": "https://ekoli.pages.dev/",
+        "name": "Ekoli Yeden Digital Home",
+        "description": "Heritage archive of Ekoli-Yeden: history, culture, language, people and festivals.",
+        "publisher": { "@id": "https://ekoli.pages.dev/#organization" },
+        "inLanguage": "en",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://ekoli.pages.dev/search?q={search_term_string}"
+          },
+          "query-input": "required name=search_term_string"
+        }
+      },
+      {
+        "@type": "Place",
+        "@id": "https://ekoli.pages.dev/#place",
+        "name": "Ekori",
+        "alternateName": "Ekoli-Yeden",
+        "description": "A community in Yakurr Local Government Area, Cross River State, Nigeria.",
+        "address": {
+          "@type": "PostalAddress",
+          "addressRegion": "Cross River State",
+          "addressCountry": "NG"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 5.880556,
+          "longitude": 8.1225
+        }
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    /* Shown while the Flutter bundle downloads. Without it a visitor on a slow
+       connection stares at a white screen and assumes the site is broken. */
+    html, body { margin: 0; padding: 0; height: 100%; background: #0A345C; }
+    #boot {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      background: #0A345C; color: #DCE7F2; z-index: 9999;
+      font-family: Georgia, "Times New Roman", serif; text-align: center; padding: 24px;
+      transition: opacity .35s ease;
+    }
+    #boot img { width: 108px; height: 108px; border-radius: 50%; background: #fff; padding: 6px; box-sizing: border-box; }
+    #boot .name { font-size: 21px; font-weight: 700; color: #fff; letter-spacing: .3px; }
+    #boot .tagline { font-size: 13px; color: #A9BFD4; max-width: 300px; line-height: 1.6; }
+    #boot .bar { width: 148px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; }
+    #boot .bar i { display: block; height: 100%; width: 40%; background: #B8912D; animation: slide 1.15s ease-in-out infinite; }
+    @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+    @media (prefers-reduced-motion: reduce) { #boot .bar i { animation: none; width: 100%; } }
+    #boot.done { opacity: 0; pointer-events: none; }
+  </style>
 </head>
 <body>
+  <!--
+    A readable summary for crawlers that do not run JavaScript, and for anyone
+    using a screen reader before the application has booted. The middleware
+    replaces this block with the actual content of the requested page when a
+    crawler asks for it.
+  -->
+  <div id="seo-content" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">
+    <h1>Ekoli Yeden Digital Home</h1>
+    <p>Preserving Our Past. Celebrating Our Present. Building Our Future.</p>
+    <p>The permanent digital home and heritage archive of Ekoli-Yeden, a community in Yakurr Local Government Area, Cross River State, Nigeria. It preserves the community's history, culture, language, traditional leadership, notable people, festivals including the Lekoli Boku New Yam Festival, photographs, videos and community life.</p>
+    <nav aria-label="Sections of the archive">
+      <a href="/about">About Ekoli-Yeden</a>
+      <a href="/history">Our History</a>
+      <a href="/culture">Culture &amp; Heritage</a>
+      <a href="/language">Learn Ekoli</a>
+      <a href="/festivals">Festivals</a>
+      <a href="/leaders">Traditional Leadership</a>
+      <a href="/people">People of Ekoli-Yeden</a>
+      <a href="/age-grades">Age Grades</a>
+      <a href="/cultural-groups">Cultural Groups</a>
+      <a href="/music">Cultural Music</a>
+      <a href="/news">News</a>
+      <a href="/events">Events</a>
+      <a href="/gallery">Photo Gallery</a>
+      <a href="/videos">Video Archive</a>
+      <a href="/community">Community Projects</a>
+      <a href="/businesses">Businesses</a>
+      <a href="/organizations">Organizations</a>
+      <a href="/contribute">Contribute to the Archive</a>
+      <a href="/preservation-team">The Preservation Team</a>
+      <a href="/contact">Contact</a>
+    </nav>
+  </div>
+
+  <div id="boot">
+    <img src="icons/Icon-192.png" alt="Ekoli Yeden Digital Home">
+    <div class="name">EKOLI YEDEN DIGITAL HOME</div>
+    <div class="tagline">Preserving Our Past. Celebrating Our Present. Building Our Future.</div>
+    <div class="bar"><i></i></div>
+  </div>
+
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Remove the splash once Flutter has painted its first frame.
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (!boot) return;
+      boot.classList.add('done');
+      setTimeout(function () { boot.remove(); }, 400);
+    });
+  </script>
 </body>
 </html>

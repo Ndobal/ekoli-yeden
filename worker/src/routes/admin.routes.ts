@@ -21,6 +21,13 @@ import {
   updateUser,
 } from '../controllers/admin.controller';
 import { adminSettings, updateSettings } from '../controllers/settings.controller';
+import { createResetLink } from '../controllers/password-reset.controller';
+import {
+  approveContribution,
+  listContributions,
+  rejectContribution,
+  serveContributionFile,
+} from '../controllers/contribution-upload.controller';
 import { deleteMedia, listMedia, updateMedia, upload } from '../controllers/media.controller';
 import { listSubmissions, review, showSubmission } from '../controllers/submission.controller';
 import { requireAuth, requirePermission, requireRole } from '../middleware/auth';
@@ -220,7 +227,46 @@ export const adminRoutes: RouteDefinition[] = [
     path: '/api/admin/users/:id/password',
     handler: resetPassword,
     middleware: [requirePermission('users:update')],
-    description: 'Reset another user password and end their sessions',
+    description: 'Set another user password directly and end their sessions',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/users/:id/reset-link',
+    handler: createResetLink,
+    middleware: [requirePermission('users:update')],
+    description:
+      'Generate a password reset link for a user, sending it where possible and returning it so '
+      + 'an administrator can pass it on',
+  },
+
+  // --- Contributed files awaiting review -----------------------------------
+  {
+    method: 'GET',
+    path: '/api/admin/contributions',
+    handler: listContributions,
+    middleware: [requirePermission('submissions:read')],
+    description: 'Files uploaded by the community, awaiting review',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/contributions/:id/file',
+    handler: serveContributionFile,
+    middleware: [requirePermission('submissions:read')],
+    description: 'Stream a contributed file for review — never public',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/contributions/:id/approve',
+    handler: approveContribution,
+    middleware: [requirePermission('submissions:review')],
+    description: 'Approve a contributed file and copy it into the archive',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/contributions/:id/reject',
+    handler: rejectContribution,
+    middleware: [requirePermission('submissions:review')],
+    description: 'Reject a contributed file. The file is retained, not deleted',
   },
   {
     method: 'POST',

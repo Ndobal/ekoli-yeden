@@ -1,5 +1,10 @@
 import type { RouteDefinition } from '../types/api';
 import { login, logout, me, refresh, register } from '../controllers/auth.controller';
+import {
+  checkResetToken,
+  forgotPassword,
+  resetPassword,
+} from '../controllers/password-reset.controller';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
 
@@ -43,5 +48,30 @@ export const authRoutes: RouteDefinition[] = [
     handler: me,
     middleware: [requireAuth],
     description: 'The signed-in user, their roles and their permissions',
+  },
+
+  // --- Password reset ------------------------------------------------------
+  // Rate limited hard: this endpoint sends messages to real people, so it is
+  // the one an abuser would use to flood somebody's inbox.
+  {
+    method: 'POST',
+    path: '/api/auth/forgot-password',
+    handler: forgotPassword,
+    middleware: [rateLimit({ scope: 'forgot-password', limit: 5, windowSeconds: 900 })],
+    description: 'Request a password reset link',
+  },
+  {
+    method: 'GET',
+    path: '/api/auth/reset-password/:token',
+    handler: checkResetToken,
+    middleware: [rateLimit({ scope: 'reset-check', limit: 30, windowSeconds: 900 })],
+    description: 'Check whether a reset link is still valid',
+  },
+  {
+    method: 'POST',
+    path: '/api/auth/reset-password',
+    handler: resetPassword,
+    middleware: [rateLimit({ scope: 'reset-password', limit: 10, windowSeconds: 900 })],
+    description: 'Set a new password using a reset link',
   },
 ];

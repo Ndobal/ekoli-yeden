@@ -47,5 +47,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  # Each directory must be listed explicitly: declaring `assets/images/` alone
+  # bundles only the files sitting directly in it, NOT its subdirectories — so
+  # the branding folder was silently omitted and every logo fell back to its
+  # placeholder.
   assets:
     - assets/images/
+    - assets/images/branding/
+    - assets/images/hero/

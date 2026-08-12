@@ -1,0 +1,24 @@
+# EKOLI YEDEN DIGITAL HOME
+# "Preserving Our Past. Celebrating Our Present. Building Our Future."
+#
+# The point of this archive is that when somebody searches for Ekoli-Yeden they
+# find a careful, verified record rather than scattered social media posts. So
+# the public archive is open to every crawler, and only the workspaces where the
+# community's own team works are kept out of the index.
+
+User-agent: *
+Allow: /
+
+# Administration and editorial workspaces. These require a sign-in and hold
+# nothing a search engine should surface.
+Disallow: /admin
+Disallow: /admin/
+Disallow: /editorial
+Disallow: /editorial/
+Disallow: /sign-in
+Disallow: /register
+
+# A search results page is not itself content worth indexing.
+Disallow: /search?
+
+Sitemap: https://ekoli.pages.dev/sitemap.xml

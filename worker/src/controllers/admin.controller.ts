@@ -7,8 +7,9 @@ import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository
 import { countByStatus } from '../repositories/base.repository';
 import { AuthService } from '../services/auth.service';
 import { PRESERVATION_TEAM, isPreservationPosition } from '../services/preservation-team.service';
+import { ROLES } from '../types/auth';
 import { hashPassword } from '../utils/crypto';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../utils/errors';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, paginated, NO_STORE_HEADERS } from '../utils/responses';
 import { parsePagination } from '../utils/pagination';
@@ -188,7 +189,11 @@ export async function updateUser(context: RequestContext): Promise<Response> {
   return json(serializeUserRecord(updated), { headers: NO_STORE_HEADERS });
 }
 
-/** `POST /api/admin/users/:id/roles` */
+/**
+ * `POST /api/admin/users/:id/roles`
+ *
+ * Granting a role. One role is guarded beyond its permission: Super Admin.
+ */
 export async function assignRole(context: RequestContext): Promise<Response> {
   const actor = requireActor(context);
   const id = context.params['id'] ?? '';
@@ -201,6 +206,15 @@ export async function assignRole(context: RequestContext): Promise<Response> {
   const role = await repository.findRoleBySlug(validated['role'] as string);
   if (!role) throw new NotFoundError('That role does not exist.');
   if (!(await repository.findById(id))) throw new NotFoundError('That user was not found.');
+
+  // Only a Super Admin may create another Super Admin.
+  //
+  // A Deputy Administrator holds every other administrative permission,
+  // including `users.assign_roles` — so without this check they could simply
+  // promote themselves and erase the distinction. The guard is on the identity
+  // of the caller, not on a permission, precisely so that no configuration of
+  // the Deputy role can grant it.
+  assertMayGovernSuperAdmin(actor, role.slug, 'appoint');
 
   await repository.assignRole(id, role.id, actor.id);
 
@@ -226,6 +240,10 @@ export async function revokeRole(context: RequestContext): Promise<Response> {
   const repository = new UserRepository(context.env.DB);
   const role = await repository.findRoleBySlug(slug);
   if (!role) throw new NotFoundError('That role does not exist.');
+
+  // Only a Super Admin may remove a Super Admin — the counterpart of the
+  // appointment guard, and the reason a Deputy cannot quietly take the archive.
+  assertMayGovernSuperAdmin(actor, role.slug, 'remove');
 
   // Removing the last Super Admin would lock the community out of its own
   // archive, so the platform refuses.
@@ -351,6 +369,33 @@ export async function auditLogs(context: RequestContext): Promise<Response> {
 function requireActor(context: RequestContext) {
   if (!context.user) throw new UnauthorizedError('Please sign in to continue.');
   return context.user;
+}
+
+/**
+ * Guards the Super Admin role itself.
+ *
+ * The Deputy Administrator exists so the community can have a second person
+ * with full operational authority without handing out the one power that can
+ * take the archive away: making and unmaking Super Admins.
+ *
+ * The check is on who the caller *is*, not on what permission they hold. That
+ * is deliberate — a Deputy holds `users.assign_roles`, so a permission-based
+ * check would let them promote themselves and dissolve the distinction. No
+ * arrangement of the Deputy's permission array can get past this.
+ */
+function assertMayGovernSuperAdmin(
+  actor: { roles: string[] },
+  targetRole: string,
+  action: 'appoint' | 'remove',
+): void {
+  if (targetRole !== ROLES.SUPER_ADMIN) return;
+  if (actor.roles.includes(ROLES.SUPER_ADMIN)) return;
+
+  throw new ForbiddenError(
+    action === 'appoint'
+      ? 'Only a Super Admin can appoint another Super Admin.'
+      : 'Only a Super Admin can remove a Super Admin.',
+  );
 }
 
 function safeParsePermissions(value: string): string[] {

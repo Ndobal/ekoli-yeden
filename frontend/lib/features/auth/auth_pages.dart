@@ -66,7 +66,7 @@ class _SignInPageState extends State<SignInPage> {
   Widget build(BuildContext context) {
     final AuthController auth = context.watch<AuthController>();
 
-    return _AuthShell(
+    return AuthShell(
       title: 'Sign in',
       subtitle: 'For members of the Preservation Team, the Editorial Team and administrators.',
       seoTitle: 'Sign in',
@@ -102,7 +102,7 @@ class _SignInPageState extends State<SignInPage> {
             ),
             if (auth.errorMessage != null) ...<Widget>[
               const Gap.lg(),
-              _ErrorNote(message: auth.errorMessage!),
+              AuthErrorNote(message: auth.errorMessage!),
             ],
             const Gap.xl(),
             FilledButton(
@@ -116,6 +116,10 @@ class _SignInPageState extends State<SignInPage> {
                   : const Text('Sign in'),
             ),
             const Gap.lg(),
+            TextButton(
+              onPressed: () => context.go(AppRoutes.forgotPassword),
+              child: const Text('I have forgotten my password'),
+            ),
             TextButton(
               onPressed: () => context.go(AppRoutes.register),
               child: const Text('Create a contributor account'),
@@ -171,7 +175,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final ThemeData theme = Theme.of(context);
 
     if (_done) {
-      return _AuthShell(
+      return AuthShell(
         title: 'Account created',
         subtitle: 'You can now sign in and contribute material for review.',
         seoTitle: 'Account created',
@@ -196,7 +200,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
     }
 
-    return _AuthShell(
+    return AuthShell(
       title: 'Create an account',
       subtitle: 'To contribute material to the archive and follow what happens to it.',
       seoTitle: 'Create an account',
@@ -237,7 +241,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             if (auth.errorMessage != null) ...<Widget>[
               const Gap.lg(),
-              _ErrorNote(message: auth.errorMessage!),
+              AuthErrorNote(message: auth.errorMessage!),
             ],
             const Gap.xl(),
             FilledButton(
@@ -263,12 +267,13 @@ class _RegisterPageState extends State<RegisterPage> {
 }
 
 /// The centred card both authentication pages sit in.
-class _AuthShell extends StatelessWidget {
-  const _AuthShell({
+class AuthShell extends StatelessWidget {
+  const AuthShell({
     required this.title,
     required this.subtitle,
     required this.seoTitle,
     required this.child,
+    super.key,
   });
 
   final String title;
@@ -338,8 +343,8 @@ class _AuthShell extends StatelessWidget {
   }
 }
 
-class _ErrorNote extends StatelessWidget {
-  const _ErrorNote({required this.message});
+class AuthErrorNote extends StatelessWidget {
+  const AuthErrorNote({required this.message, super.key});
 
   final String message;
 

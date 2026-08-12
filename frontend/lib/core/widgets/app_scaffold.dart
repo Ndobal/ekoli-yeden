@@ -470,6 +470,13 @@ class _MobileDrawer extends StatelessWidget {
   }
 }
 
+/// The site footer.
+///
+/// Every colour used here is stated explicitly from `OnDark`. That is not
+/// fussiness: the theme's own text styles carry foreground colours chosen for
+/// light surfaces, so applying `bodySmall` unchanged on this navy background
+/// produced dark-grey text on dark navy — which is how the link row became
+/// unreadable. Nothing in this widget inherits a colour.
 class _Footer extends StatelessWidget {
   const _Footer({required this.settings});
 
@@ -479,112 +486,174 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final int year = DateTime.now().year;
-    final List<NavItem> footer = context.watch<CmsController>().footerNavigationOrFallback;
+    final List<NavItem> primary = context.watch<CmsController>().primaryNavigationOrFallback;
+    final List<NavItem> secondary = context.watch<CmsController>().footerNavigationOrFallback;
+    final bool wide = context.screenWidth >= Breakpoints.tablet;
+
+    // Two link columns on a wide screen, stacked on a phone. Splitting the
+    // primary menu keeps each column a readable length rather than one long run.
+    final List<NavItem> explore = primary.where((NavItem item) => !item.isCta).toList();
+    final int half = (explore.length / 2).ceil();
+
+    final Widget brandBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            const BrandLogo(size: 64, onDarkBackground: true),
+            const Gap.hLg(),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  CmsText(
+                    'brand.name',
+                    fallback: settings.siteName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: OnDark.primary,
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Gap.xs(),
+                  CmsText(
+                    'brand.tagline',
+                    fallback: settings.tagline,
+                    style: theme.textTheme.bodySmall?.copyWith(color: OnDark.link),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const Gap.lg(),
+        CmsText(
+          'footer.about.body',
+          fallback:
+              'A permanent digital home for the history, culture, language and people of '
+              'Ekoli-Yeden, built and maintained by the community.',
+          style: theme.textTheme.bodyMedium?.copyWith(color: OnDark.body, height: 1.6),
+        ),
+        const Gap.lg(),
+        const BrandPillars(onDarkBackground: true),
+      ],
+    );
 
     return Container(
       width: double.infinity,
       color: AppColors.navy,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
       child: PageWidthContainer(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            if (wide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(flex: 5, child: brandBlock),
+                  const SizedBox(width: AppSpacing.xxl),
+                  Expanded(
+                    flex: 2,
+                    child: _FooterColumn(
+                      heading: 'Explore',
+                      items: explore.take(half).toList(),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: _FooterColumn(
+                      heading: 'The archive',
+                      items: explore.skip(half).toList(),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: _FooterColumn(heading: 'More', items: secondary),
+                  ),
+                ],
+              )
+            else ...<Widget>[
+              brandBlock,
+              const Gap.xxl(),
+              _FooterColumn(heading: 'Explore', items: explore),
+              const Gap.xl(),
+              _FooterColumn(heading: 'More', items: secondary),
+            ],
+
+            if (settings.contactEmail != null ||
+                settings.contactPhone != null ||
+                settings.contactAddress != null) ...<Widget>[
+              const Gap.xxl(),
+              CmsText(
+                'footer.contact.title',
+                fallback: 'Contact',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: OnDark.primary,
+                  letterSpacing: 1.2,
+                ),
+                transform: (String value) => value.toUpperCase(),
+              ),
+              const Gap.sm(),
+              Wrap(
+                spacing: AppSpacing.xl,
+                runSpacing: AppSpacing.xs,
+                children: <Widget>[
+                  if (settings.contactEmail != null)
+                    _ContactLine(icon: Icons.mail_outline, value: settings.contactEmail!),
+                  if (settings.contactPhone != null)
+                    _ContactLine(icon: Icons.phone_outlined, value: settings.contactPhone!),
+                  if (settings.contactAddress != null)
+                    _ContactLine(icon: Icons.place_outlined, value: settings.contactAddress!),
+                ],
+              ),
+            ],
+
+            const Gap.xxl(),
+            const Divider(color: OnDark.divider, height: 1),
+            const Gap.lg(),
+
+            // The bottom line wraps rather than overflowing on a phone.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.lg,
+              runSpacing: AppSpacing.sm,
               children: <Widget>[
-                const BrandLogo(size: 56, onDarkBackground: true),
-                const Gap.hLg(),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      CmsText(
-                        'brand.name',
-                        fallback: settings.siteName,
-                        style: theme.textTheme.titleLarge?.copyWith(color: Colors.white),
+                      Text(
+                        '© $year',
+                        style: theme.textTheme.bodySmall?.copyWith(color: OnDark.muted),
                       ),
-                      const Gap.xs(),
-                      CmsText(
-                        'brand.tagline',
-                        fallback: settings.tagline,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.skyBlue),
+                      const Gap.hSm(),
+                      Flexible(
+                        child: CmsText(
+                          'footer.copyright',
+                          fallback:
+                              'This archive is built and maintained by the Ekoli-Yeden '
+                              'Preservation Team and the wider community.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: OnDark.muted),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const Gap.xl(),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppSpacing.maxReadingWidth),
-              child: CmsText(
-                'footer.about.body',
-                fallback:
-                    'A permanent digital home for the history, culture, language and people of '
-                    'Ekoli-Yeden, built and maintained by the community.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
-                ),
-              ),
-            ),
-            const Gap.xxl(),
-            Wrap(
-              spacing: AppSpacing.xl,
-              runSpacing: AppSpacing.xs,
-              children: footer
-                  .map(
-                    (NavItem item) => TextButton(
-                      onPressed: () => context.go(item.path),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 36),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        foregroundColor: AppColors.skyBlue,
-                      ),
-                      child: Text(item.label, style: theme.textTheme.bodySmall),
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-            if (settings.contactEmail != null || settings.contactPhone != null) ...<Widget>[
-              const Gap.xl(),
-              CmsText(
-                'footer.contact.title',
-                fallback: 'Contact',
-                style: theme.textTheme.titleSmall?.copyWith(color: Colors.white),
-              ),
-              const Gap.xs(),
-              if (settings.contactEmail != null)
-                SelectableText(
-                  settings.contactEmail!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.skyBlue),
-                ),
-              if (settings.contactPhone != null)
-                SelectableText(
-                  settings.contactPhone!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.skyBlue),
-                ),
-            ],
-            const Gap.xxl(),
-            Divider(color: Colors.white.withValues(alpha: 0.15)),
-            const Gap.lg(),
-            Row(
-              children: <Widget>[
-                Text(
-                  '© $year · ',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.6),
-                  ),
-                ),
-                Expanded(
-                  child: CmsText(
-                    'footer.copyright',
-                    fallback:
-                        'This archive is built and maintained by the Ekoli-Yeden Preservation Team '
-                        'and the wider community.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.6),
-                    ),
+                TextButton.icon(
+                  onPressed: () => context.go(AppRoutes.contribute),
+                  icon: const Icon(Icons.favorite_outline, size: 15),
+                  label: const Text('Contribute to the archive'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: OnDark.link,
+                    textStyle: theme.textTheme.labelMedium,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ],
@@ -592,6 +661,105 @@ class _Footer extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One column of footer links.
+class _FooterColumn extends StatelessWidget {
+  const _FooterColumn({required this.heading, required this.items});
+
+  final String heading;
+  final List<NavItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          heading.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: OnDark.primary,
+            letterSpacing: 1.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Gap.md(),
+        ...items.map(
+          (NavItem item) => _FooterLink(item: item),
+        ),
+      ],
+    );
+  }
+}
+
+/// A footer link with a visible hover state and an explicit colour.
+class _FooterLink extends StatefulWidget {
+  const _FooterLink({required this.item});
+
+  final NavItem item;
+
+  @override
+  State<_FooterLink> createState() => _FooterLinkState();
+}
+
+class _FooterLinkState extends State<_FooterLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: Semantics(
+        link: true,
+        child: GestureDetector(
+          onTap: () => context.go(widget.item.path),
+          child: Padding(
+            // Generous vertical padding so each link is a comfortable target on
+            // a phone without the column becoming sparse.
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              widget.item.label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: _hovered ? OnDark.primary : OnDark.body,
+                decoration: _hovered ? TextDecoration.underline : null,
+                decorationColor: OnDark.link,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactLine extends StatelessWidget {
+  const _ContactLine({required this.icon, required this.value});
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icon, size: 15, color: OnDark.link),
+        const Gap.hSm(),
+        SelectableText(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: OnDark.body),
+        ),
+      ],
     );
   }
 }

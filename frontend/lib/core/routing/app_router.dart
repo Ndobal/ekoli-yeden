@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/about/about_pages.dart';
 import '../../features/auth/auth_pages.dart';
+import '../../features/auth/password_reset_pages.dart';
 import '../../features/businesses/directory_pages.dart';
 import '../../features/contributions/contribute_page.dart';
 import '../../features/culture/cultural_life_pages.dart';
@@ -20,6 +21,7 @@ import '../../features/news/news_pages.dart';
 import '../../features/people/people_pages.dart';
 import '../../features/search/search_page.dart';
 import '../../features/videos/video_pages.dart';
+import '../../features/workspace/contributions_page.dart';
 import '../../features/workspace/media_library_page.dart';
 import '../../features/workspace/workspace_pages.dart';
 import '../../admin/admin_dashboard.dart';
@@ -271,6 +273,15 @@ GoRouter buildRouter(AuthController auth) {
             SignInPage(redirectTo: state.uri.queryParameters['redirect']),
       ),
       GoRoute(path: AppRoutes.register, builder: (_, _) => const RegisterPage()),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (_, _) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (_, GoRouterState state) =>
+            ResetPasswordPage(token: state.uri.queryParameters['token']),
+      ),
 
       // --- Editorial Team ---------------------------------------------------
       // Every item in `editorialNavigation` has a route here. A sidebar link
@@ -306,6 +317,10 @@ GoRouter buildRouter(AuthController auth) {
         builder: (_, _) => const SourcesPage(workspace: WorkspaceKind.editorial),
       ),
       GoRoute(
+        path: AppRoutes.editorialContributions,
+        builder: (_, _) => const ContributionsReviewPage(workspace: WorkspaceKind.editorial),
+      ),
+      GoRoute(
         path: AppRoutes.editorialContributors,
         builder: (_, _) => const SubmissionsQueuePage(workspace: WorkspaceKind.editorial),
       ),
@@ -329,6 +344,10 @@ GoRouter buildRouter(AuthController auth) {
       GoRoute(
         path: AppRoutes.adminSubmissions,
         builder: (_, _) => const SubmissionsQueuePage(workspace: WorkspaceKind.admin),
+      ),
+      GoRoute(
+        path: AppRoutes.adminContributions,
+        builder: (_, _) => const ContributionsReviewPage(workspace: WorkspaceKind.admin),
       ),
       GoRoute(
         path: AppRoutes.adminSources,
