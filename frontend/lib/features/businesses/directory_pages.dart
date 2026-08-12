@@ -22,6 +22,7 @@ class BusinessesListPage extends StatelessWidget {
       basePath: AppRoutes.businesses,
       eyebrow: 'Directory',
       title: 'Businesses & Professionals',
+      descriptionKey: 'page.businesses.intro',
       description:
           'Businesses, trades and professional services run by people of Ekoli-Yeden, at home and '
           'abroad — so the community can find and support its own.',
@@ -75,6 +76,7 @@ class OrganizationsListPage extends StatelessWidget {
       basePath: AppRoutes.organizations,
       eyebrow: 'Directory',
       title: 'Organizations',
+      descriptionKey: 'page.organizations.intro',
       description:
           'Unions, associations, societies, schools, churches and other bodies serving the '
           'Ekoli-Yeden community.',
@@ -128,6 +130,7 @@ class CommunityProjectsListPage extends StatelessWidget {
       basePath: AppRoutes.community,
       eyebrow: 'Development',
       title: 'Community Projects',
+      descriptionKey: 'page.community.intro',
       description:
           'Development projects in Ekoli-Yeden: what is planned, what is underway, what has been '
           'completed, and how each is progressing.',

@@ -20,6 +20,7 @@ class EventsListPage extends StatelessWidget {
       basePath: AppRoutes.events,
       eyebrow: 'What is happening',
       title: 'Events',
+      descriptionKey: 'page.events.intro',
       description:
           'Community meetings, ceremonies, cultural activities and gatherings — those coming up, '
           'and those already held.',

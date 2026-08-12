@@ -52,6 +52,7 @@ class AppRoutes {
   static const String editorialSubmissions = '/editorial/submissions';
   static const String editorialSources = '/editorial/sources';
   static const String editorialContributors = '/editorial/contributors';
+  static const String editorialMedia = '/editorial/media';
 
   // --- Super Admin ----------------------------------------------------------
   static const String admin = '/admin';
@@ -187,9 +188,27 @@ const List<NavItem> editorialNavigation = <NavItem>[
   NavItem(label: 'Gallery', path: AppRoutes.editorialGallery),
   NavItem(label: 'Videos', path: AppRoutes.editorialVideos),
   NavItem(label: 'Community', path: AppRoutes.editorialCommunity),
-  NavItem(label: 'Submissions', path: AppRoutes.editorialSubmissions),
+  NavItem(label: 'Media library', path: AppRoutes.editorialMedia, description: 'Upload photographs, audio and documents'),
+  NavItem(label: 'Submissions', path: AppRoutes.editorialSubmissions, description: 'What the community has sent in'),
   NavItem(label: 'Sources', path: AppRoutes.editorialSources, description: 'The citation library'),
 ];
+
+/// The content types an editor can create and edit, and the resource key each
+/// maps to. Drives both the sidebar and the generated editorial routes, so the
+/// two can never drift apart.
+const Map<String, ({String resource, String title})> editorialContentScreens =
+    <String, ({String resource, String title})>{
+  AppRoutes.editorialHistory: (resource: 'history', title: 'History'),
+  AppRoutes.editorialCulture: (resource: 'culture', title: 'Culture'),
+  AppRoutes.editorialLanguage: (resource: 'language', title: 'Language'),
+  AppRoutes.editorialLeboku: (resource: 'festivals', title: 'Leboku'),
+  AppRoutes.editorialPeople: (resource: 'people', title: 'People'),
+  AppRoutes.editorialNews: (resource: 'news', title: 'News'),
+  AppRoutes.editorialEvents: (resource: 'events', title: 'Events'),
+  AppRoutes.editorialGallery: (resource: 'galleries', title: 'Gallery'),
+  AppRoutes.editorialVideos: (resource: 'videos', title: 'Videos'),
+  AppRoutes.editorialCommunity: (resource: 'community', title: 'Community projects'),
+};
 
 /// The Super Admin sidebar. Administration only — a different interface.
 const List<NavItem> adminNavigation = <NavItem>[
@@ -199,9 +218,17 @@ const List<NavItem> adminNavigation = <NavItem>[
   NavItem(label: 'Editorial Team', path: AppRoutes.adminEditorialTeam),
   NavItem(label: 'Content', path: AppRoutes.adminContent),
   NavItem(label: 'Submissions', path: AppRoutes.adminSubmissions),
-  NavItem(label: 'Media', path: AppRoutes.adminMedia),
+  NavItem(label: 'Media library', path: AppRoutes.adminMedia),
   NavItem(label: 'Sources', path: AppRoutes.adminSources),
   NavItem(label: 'Audit logs', path: AppRoutes.adminAuditLogs),
   NavItem(label: 'Security', path: AppRoutes.adminSecurity),
   NavItem(label: 'Site settings', path: AppRoutes.adminSettings),
+  // The Super Admin edits and publishes content from the Editorial workspace
+  // rather than a second, parallel set of screens. The wildcard permission
+  // means every control there is available; this is the way in.
+  NavItem(
+    label: 'Editorial workspace →',
+    path: AppRoutes.editorialDashboard,
+    description: 'Write, edit and publish website content',
+  ),
 ];

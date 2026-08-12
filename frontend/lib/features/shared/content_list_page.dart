@@ -5,6 +5,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
+import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/content_card.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
@@ -27,6 +28,7 @@ class ContentListPage extends StatefulWidget {
     required this.basePath,
     this.eyebrow,
     this.description,
+    this.descriptionKey,
     this.emptyTitle,
     this.emptyMessage,
     this.metaBuilder,
@@ -45,7 +47,13 @@ class ContentListPage extends StatefulWidget {
   final String basePath;
 
   final String? eyebrow;
+
+  /// The fallback introduction, used when `descriptionKey` has no CMS value.
   final String? description;
+
+  /// CMS key for the introduction, so the Editorial Team can rewrite it.
+  final String? descriptionKey;
+
   final String? emptyTitle;
   final String? emptyMessage;
 
@@ -82,17 +90,24 @@ class _ContentListPageState extends State<ContentListPage> {
   Widget build(BuildContext context) {
     final ContentRepository repository = context.contentRepository(widget.resource);
 
+    // The introduction comes from the CMS where a key is supplied, so the
+    // Editorial Team can rewrite any section's opening paragraph without a
+    // deployment. The constructor argument is the fallback.
+    final String? description = widget.descriptionKey == null
+        ? widget.description
+        : context.cmsWatch(widget.descriptionKey!, fallback: widget.description ?? '');
+
     return AppScaffold(
       currentPath: widget.basePath,
       seo: SeoMetadata(
         title: widget.title,
-        description: widget.description,
+        description: description,
         canonicalPath: widget.basePath,
       ),
       child: PageSection(
         eyebrow: widget.eyebrow,
         title: widget.title,
-        description: widget.description,
+        description: description,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

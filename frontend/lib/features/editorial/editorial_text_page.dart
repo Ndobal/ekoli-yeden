@@ -17,6 +17,7 @@ import '../../core/config/service_locator.dart';
 import '../../services/api/api_response.dart';
 import '../../models/content_record.dart';
 import '../../services/auth/auth_controller.dart';
+import '../workspace/content_editor.dart';
 import 'editorial_shell.dart';
 
 /// EDIT THE WEBSITE'S TEXT.
@@ -372,9 +373,11 @@ class _StringEditorState extends State<_StringEditor> {
 
 /// The editorial list screen for one content type.
 ///
-/// Shows every record in every status, with its position in the workflow, so an
-/// editor can see at a glance what is waiting on them.
-class EditorialContentPage extends StatelessWidget {
+/// Shows every record in every status with its position in the workflow, and
+/// lets an authorised account create a new one or edit an existing one. This is
+/// where a Super Admin or an editor actually contributes material, rather than
+/// only adjusting text that already exists.
+class EditorialContentPage extends StatefulWidget {
   const EditorialContentPage({
     required this.resource,
     required this.title,
@@ -387,80 +390,228 @@ class EditorialContentPage extends StatelessWidget {
   final String path;
 
   @override
+  State<EditorialContentPage> createState() => _EditorialContentPageState();
+}
+
+class _EditorialContentPageState extends State<EditorialContentPage> {
+  int _reloadToken = 0;
+  String? _status;
+
+  void _reload() => setState(() => _reloadToken += 1);
+
+  Future<void> _openEditor({ContentRecord? record}) async {
+    final bool? saved = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => ContentEditorDialog(
+        resource: widget.resource,
+        title: widget.title,
+        record: record,
+      ),
+    );
+    if (saved ?? false) _reload();
+  }
+
+  Future<void> _changeStatus(ContentRecord record, String status) async {
+    try {
+      await context.contentRepository(widget.resource).changeStatus(record.id, status);
+      _reload();
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final ContentRepository repository = context.contentRepository(resource);
+    final AuthController auth = context.watch<AuthController>();
+    final ContentRepository repository = context.contentRepository(widget.resource);
+
+    final bool canCreate = auth.can('content.create') ||
+        auth.can('${widget.resource}:create') ||
+        auth.can('*');
 
     return WorkspaceShell(
-      currentPath: path,
-      title: title,
+      currentPath: widget.path,
+      title: widget.title,
       workspaceName: 'Editorial',
       accent: AppColors.skyBlue,
       navigation: editorialNavigation,
-      child: AsyncContent<PaginatedResult<ContentRecord>>(
-        load: () => repository.adminList(perPage: 50),
-        loadingMessage: 'Loading $title…',
-        isEmpty: (PaginatedResult<ContentRecord> result) => result.isEmpty,
-        emptyBuilder: (BuildContext context) => EmptyView(
-          icon: Icons.article_outlined,
-          title: 'No $title records yet',
-          message:
-              'Nothing has been created in this section. When the Preservation Team supplies '
-              'material, it is entered here and moves through review before it reaches the '
-              'public site.',
-          showContributeAction: false,
-        ),
-        builder: (BuildContext context, PaginatedResult<ContentRecord> result) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '${result.total} record${result.total == 1 ? '' : 's'}',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const Gap.lg(),
-            ...result.items.map(
-              (ContentRecord record) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: AppRadius.smAll,
-                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(record.displayTitle, style: theme.textTheme.titleSmall),
-                            if (record.summary != null) ...<Widget>[
-                              const Gap.xs(),
-                              Text(
-                                record.summary!,
-                                style: theme.textTheme.bodySmall,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const Gap.hLg(),
-                      if (record.verificationStatus != null) ...<Widget>[
-                        VerificationBadge(record.verificationStatus!),
-                        const Gap.hSm(),
-                      ],
-                      StatusBadge(record.status),
-                    ],
-                  ),
+      actions: <Widget>[
+        if (canCreate)
+          FilledButton.icon(
+            onPressed: _openEditor,
+            icon: const Icon(Icons.add, size: 18),
+            label: Text('New ${widget.title.toLowerCase()}'),
+          ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: <Widget>[
+              FilterChip(
+                label: const Text('All'),
+                selected: _status == null,
+                onSelected: (_) => setState(() => _status = null),
+              ),
+              ...ContentStatus.all.map(
+                (String status) => FilterChip(
+                  label: Text(ContentStatus.label(status)),
+                  selected: _status == status,
+                  onSelected: (bool selected) =>
+                      setState(() => _status = selected ? status : null),
                 ),
               ),
+            ],
+          ),
+          const Gap.xl(),
+
+          AsyncContent<PaginatedResult<ContentRecord>>(
+            key: ValueKey<String>('${widget.resource}:$_status:$_reloadToken'),
+            load: () => repository.adminList(perPage: 60, status: _status),
+            loadingMessage: 'Loading ${widget.title.toLowerCase()}…',
+            isEmpty: (PaginatedResult<ContentRecord> result) => result.isEmpty,
+            emptyBuilder: (BuildContext context) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                EmptyView(
+                  icon: Icons.article_outlined,
+                  title: 'No ${widget.title.toLowerCase()} records yet',
+                  message:
+                      'Nothing has been created in this section. Use “New '
+                      '${widget.title.toLowerCase()}” above to add the first entry — it starts as '
+                      'a draft and only reaches the public site once it has been published.',
+                  showContributeAction: false,
+                ),
+              ],
             ),
-          ],
-        ),
+            builder: (BuildContext context, PaginatedResult<ContentRecord> result) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '${result.total} record${result.total == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const Gap.lg(),
+                ...result.items.map(
+                  (ContentRecord record) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: AppRadius.smAll,
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(record.displayTitle, style: theme.textTheme.titleSmall),
+                                    if (record.summary != null) ...<Widget>[
+                                      const Gap.xs(),
+                                      Text(
+                                        record.summary!,
+                                        style: theme.textTheme.bodySmall,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const Gap.hLg(),
+                              if (record.verificationStatus != null) ...<Widget>[
+                                VerificationBadge(record.verificationStatus!),
+                                const Gap.hSm(),
+                              ],
+                              StatusBadge(record.status),
+                            ],
+                          ),
+                          const Gap.md(),
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.xs,
+                            children: <Widget>[
+                              OutlinedButton.icon(
+                                onPressed: () => _openEditor(record: record),
+                                icon: const Icon(Icons.edit_outlined, size: 16),
+                                label: const Text('Edit'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(0, 34),
+                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                                ),
+                              ),
+                              if (record.status == ContentStatus.draft &&
+                                  (auth.can('content.submit') || auth.can('*')))
+                                _WorkflowButton(
+                                  label: 'Submit for review',
+                                  onPressed: () =>
+                                      _changeStatus(record, ContentStatus.pendingReview),
+                                ),
+                              if (record.status == ContentStatus.pendingReview && auth.canReview)
+                                _WorkflowButton(
+                                  label: 'Approve',
+                                  onPressed: () => _changeStatus(record, ContentStatus.approved),
+                                ),
+                              if (record.status != ContentStatus.published && auth.canPublish)
+                                _WorkflowButton(
+                                  label: 'Publish',
+                                  emphasised: true,
+                                  onPressed: () => _changeStatus(record, ContentStatus.published),
+                                ),
+                              if (record.status == ContentStatus.published && auth.canPublish)
+                                _WorkflowButton(
+                                  label: 'Unpublish',
+                                  onPressed: () => _changeStatus(record, ContentStatus.draft),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _WorkflowButton extends StatelessWidget {
+  const _WorkflowButton({
+    required this.label,
+    required this.onPressed,
+    this.emphasised = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool emphasised;
+
+  @override
+  Widget build(BuildContext context) {
+    final ButtonStyle style = ButtonStyle(
+      minimumSize: WidgetStateProperty.all(const Size(0, 34)),
+      padding: WidgetStateProperty.all(
+        const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      ),
+    );
+
+    return emphasised
+        ? FilledButton(onPressed: onPressed, style: style, child: Text(label))
+        : OutlinedButton(onPressed: onPressed, style: style, child: Text(label));
   }
 }

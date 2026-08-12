@@ -21,6 +21,7 @@ class PeopleListPage extends StatelessWidget {
       basePath: AppRoutes.people,
       eyebrow: 'Our people',
       title: 'People of Ekoli-Yeden',
+      descriptionKey: 'page.people.intro',
       description:
           'Scholars, professionals, artists, entrepreneurs, athletes, clergy and community builders '
           'from Ekoli-Yeden and its diaspora.',

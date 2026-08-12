@@ -23,6 +23,7 @@ class GalleryListPage extends StatelessWidget {
       basePath: AppRoutes.gallery,
       eyebrow: 'Photographs',
       title: 'Gallery',
+      descriptionKey: 'page.gallery.intro',
       description:
           'Photographs of Ekoli-Yeden — its people, ceremonies, festivals, schools and everyday '
           'life — labelled with what they show so they can still be understood by people who were '

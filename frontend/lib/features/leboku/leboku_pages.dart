@@ -11,6 +11,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
+import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/content_card.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
@@ -51,10 +52,13 @@ class LebokuIndexPage extends StatelessWidget {
           PageSection(
             eyebrow: 'The festival archive',
             title: 'Every year, preserved',
-            description:
-                'Each edition of the festival keeps its own permanent page — its programme, its '
-                'announcements, its photographs and its videos. When the festival is over, the '
-                'year remains.',
+            description: context.cmsWatch(
+              'page.leboku.intro',
+              fallback:
+                  'Each edition of the festival keeps its own permanent page — its programme, its '
+                  'announcements, its photographs and its videos. When the festival is over, the '
+                  'year remains.',
+            ),
             child: AsyncContent<List<FestivalEdition>>(
               load: repository.lebokuEditions,
               loadingMessage: 'Opening the festival archive…',

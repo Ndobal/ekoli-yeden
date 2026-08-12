@@ -10,6 +10,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
+import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/content_card.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
@@ -52,9 +53,12 @@ class _VideosListPageState extends State<VideosListPage> {
       child: PageSection(
         eyebrow: 'Video archive',
         title: 'Videos',
-        description:
-            'Documentaries, interviews, oral history recordings, festival performances, ceremonies '
-            'and music. Videos are hosted on YouTube and organised here.',
+        description: context.cmsWatch(
+          'page.videos.intro',
+          fallback:
+              'Documentaries, interviews, oral history recordings, festival performances, '
+              'ceremonies and music. Videos are hosted on YouTube and organised here.',
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

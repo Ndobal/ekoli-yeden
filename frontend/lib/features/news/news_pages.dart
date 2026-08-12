@@ -21,6 +21,7 @@ class NewsListPage extends StatelessWidget {
       basePath: AppRoutes.news,
       eyebrow: 'Community',
       title: 'News & Announcements',
+      descriptionKey: 'page.news.intro',
       description:
           'Official community news, announcements, appointments, achievements and notices. '
           'Published here permanently, and shared onward through social media.',

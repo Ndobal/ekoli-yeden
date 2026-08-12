@@ -129,16 +129,20 @@ class AboutPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('What this archive is for', style: theme.textTheme.headlineSmall),
+                CmsText(
+                  'page.about.why.title',
+                  fallback: 'Why this archive exists',
+                  style: theme.textTheme.headlineSmall,
+                ),
                 const Gap.lg(),
-                Text(
-                  'A photograph is lost when a phone breaks. A message disappears when a group is '
-                  'cleared. Knowledge that is never written down goes with the person who held it. '
-                  'Social media was built to circulate things quickly, not to keep them — a post '
-                  'from today is nearly impossible to find in five years.\n\n'
-                  'This archive is the alternative: one permanent place where the history, '
-                  'language, culture, people and festivals of ${settings.communityName} are '
-                  'collected, checked, labelled and kept.',
+                CmsText(
+                  'page.about.why.body',
+                  fallback:
+                      'A photograph is lost when a phone breaks. A message disappears when a group '
+                      'is cleared. Knowledge that is never written down goes with the person who '
+                      'held it.\n\nThis archive is the alternative: one permanent place where the '
+                      'history, language, culture, people and festivals of ${settings.communityName} '
+                      'are collected, checked, labelled and kept.',
                   style: theme.textTheme.bodyLarge,
                 ),
                 const Gap.xxl(),
@@ -146,7 +150,11 @@ class AboutPage extends StatelessWidget {
                 const Gap.lg(),
                 const _WorkflowSteps(),
                 const Gap.xxl(),
-                Text('What this archive will not do', style: theme.textTheme.headlineSmall),
+                CmsText(
+                  'page.about.promise.title',
+                  fallback: 'What this archive will not do',
+                  style: theme.textTheme.headlineSmall,
+                ),
                 const Gap.lg(),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.xl),
@@ -155,14 +163,14 @@ class AboutPage extends StatelessWidget {
                     borderRadius: AppRadius.mdAll,
                     border: const Border(left: BorderSide(color: AppColors.green, width: 4)),
                   ),
-                  child: Text(
-                    'It will not invent anything.\n\n'
-                    'No history, no chief, no leader, no date, no cultural claim, no statistic and '
-                    'no meaning of an Ekoli word appears on this site because software produced it. '
-                    'Where the community has not yet supplied something, the page says so plainly '
-                    'rather than filling the space with a plausible guess.\n\n'
-                    'Material drawn from outside sources is labelled with where it came from, and '
-                    'is marked as unverified until the Preservation Team has checked it.',
+                  child: CmsText(
+                    'page.about.promise.body',
+                    fallback:
+                        'It will not invent anything.\n\nNo history, no chief, no leader, no date, '
+                        'no cultural claim, no statistic and no meaning of an Ekoli word appears on '
+                        'this site because software produced it. Where the community has not yet '
+                        'supplied something, the page says so plainly rather than filling the space '
+                        'with a plausible guess.',
                     style: theme.textTheme.bodyLarge,
                   ),
                 ),

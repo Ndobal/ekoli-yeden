@@ -21,6 +21,7 @@ class LeadershipListPage extends StatelessWidget {
       basePath: AppRoutes.leaders,
       eyebrow: 'Traditional institution',
       title: 'Leadership',
+      descriptionKey: 'page.leaders.intro',
       description:
           'Traditional rulers, chiefs, the council and community leadership — past and present. '
           'This record is maintained with the traditional institution and is verified before '

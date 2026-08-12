@@ -19,6 +19,8 @@ import '../../features/news/news_pages.dart';
 import '../../features/people/people_pages.dart';
 import '../../features/search/search_page.dart';
 import '../../features/videos/video_pages.dart';
+import '../../features/workspace/media_library_page.dart';
+import '../../features/workspace/workspace_pages.dart';
 import '../../admin/admin_dashboard.dart';
 import '../../admin/admin_users_page.dart';
 import '../../services/auth/auth_controller.dart';
@@ -225,6 +227,9 @@ GoRouter buildRouter(AuthController auth) {
       GoRoute(path: AppRoutes.register, builder: (_, _) => const RegisterPage()),
 
       // --- Editorial Team ---------------------------------------------------
+      // Every item in `editorialNavigation` has a route here. A sidebar link
+      // that 404s is worse than no link at all, so the content screens are
+      // generated from the same map the sidebar is built from.
       GoRoute(
         path: AppRoutes.editorial,
         redirect: (_, _) => AppRoutes.editorialDashboard,
@@ -242,38 +247,57 @@ GoRouter buildRouter(AuthController auth) {
         path: AppRoutes.editorialNavigation,
         builder: (_, _) => const EditorialTextPage(group: 'navigation', title: 'Navigation'),
       ),
+      GoRoute(
+        path: AppRoutes.editorialMedia,
+        builder: (_, _) => const MediaLibraryPage(workspace: WorkspaceKind.editorial),
+      ),
+      GoRoute(
+        path: AppRoutes.editorialSubmissions,
+        builder: (_, _) => const SubmissionsQueuePage(workspace: WorkspaceKind.editorial),
+      ),
+      GoRoute(
+        path: AppRoutes.editorialSources,
+        builder: (_, _) => const SourcesPage(workspace: WorkspaceKind.editorial),
+      ),
+      GoRoute(
+        path: AppRoutes.editorialContributors,
+        builder: (_, _) => const SubmissionsQueuePage(workspace: WorkspaceKind.editorial),
+      ),
       ..._editorialContentRoutes(),
 
       // --- Super Admin ------------------------------------------------------
+      // Likewise: every item in `adminNavigation` resolves.
       GoRoute(path: AppRoutes.admin, redirect: (_, _) => AppRoutes.adminDashboard),
       GoRoute(path: AppRoutes.adminDashboard, builder: (_, _) => const AdminDashboard()),
       GoRoute(path: AppRoutes.adminUsers, builder: (_, _) => const AdminUsersPage()),
       GoRoute(path: AppRoutes.adminRoles, builder: (_, _) => const AdminRolesPage()),
       GoRoute(path: AppRoutes.adminAuditLogs, builder: (_, _) => const AdminAuditLogPage()),
+      GoRoute(path: AppRoutes.adminEditorialTeam, builder: (_, _) => const AdminEditorialTeamPage()),
+      GoRoute(path: AppRoutes.adminContent, builder: (_, _) => const AdminContentPage()),
+      GoRoute(path: AppRoutes.adminSettings, builder: (_, _) => const AdminSettingsPage()),
+      GoRoute(path: AppRoutes.adminSecurity, builder: (_, _) => const AdminSecurityPage()),
+      GoRoute(
+        path: AppRoutes.adminMedia,
+        builder: (_, _) => const MediaLibraryPage(workspace: WorkspaceKind.admin),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSubmissions,
+        builder: (_, _) => const SubmissionsQueuePage(workspace: WorkspaceKind.admin),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSources,
+        builder: (_, _) => const SourcesPage(workspace: WorkspaceKind.admin),
+      ),
     ],
   );
 }
 
-/// The editorial content screens, generated from the sidebar definition.
+/// The editorial content screens.
 ///
-/// Each is the same list-and-workflow screen pointed at a different resource,
-/// which is what the CMS registry on the server already makes possible.
+/// Generated from `editorialContentScreens`, which is also what builds the
+/// sidebar — so a link and its route cannot drift apart.
 List<GoRoute> _editorialContentRoutes() {
-  const Map<String, ({String resource, String title})> screens =
-      <String, ({String resource, String title})>{
-    AppRoutes.editorialHistory: (resource: 'history', title: 'History'),
-    AppRoutes.editorialCulture: (resource: 'culture', title: 'Culture'),
-    AppRoutes.editorialLanguage: (resource: 'language', title: 'Language'),
-    AppRoutes.editorialLeboku: (resource: 'festivals', title: 'Leboku'),
-    AppRoutes.editorialPeople: (resource: 'people', title: 'People'),
-    AppRoutes.editorialNews: (resource: 'news', title: 'News'),
-    AppRoutes.editorialEvents: (resource: 'events', title: 'Events'),
-    AppRoutes.editorialGallery: (resource: 'galleries', title: 'Gallery'),
-    AppRoutes.editorialVideos: (resource: 'videos', title: 'Videos'),
-    AppRoutes.editorialCommunity: (resource: 'community', title: 'Community projects'),
-  };
-
-  return screens.entries
+  return editorialContentScreens.entries
       .map(
         (MapEntry<String, ({String resource, String title})> entry) => GoRoute(
           path: entry.key,

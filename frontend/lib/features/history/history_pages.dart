@@ -21,6 +21,7 @@ class HistoryListPage extends StatelessWidget {
       basePath: AppRoutes.history,
       eyebrow: 'Heritage',
       title: 'Our History',
+      descriptionKey: 'page.history.intro',
       description:
           'The recorded history of Ekoli-Yeden: its origins, its important events, its traditional '
           'institutions and the accounts held by its elders. Each entry names its source, and shows '
