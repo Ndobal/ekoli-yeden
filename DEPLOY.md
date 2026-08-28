@@ -53,7 +53,10 @@ npx wrangler whoami        # should show the Ndovera account
 
 ## 2. Apply the pending migrations
 
-Twenty-one are pending on production: `0010`–`0030`.
+Nothing is pending. `0001`–`0030` are applied to production as of
+28 August 2026 — the API and the website were deployed from this commit.
+
+To check, or after adding one:
 
 ```bash
 cd worker
