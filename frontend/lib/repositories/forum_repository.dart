@@ -22,7 +22,15 @@ class ForumRepository {
   /// arriving from a WhatsApp link should be able to read it before being
   /// asked to sign in for anything.
   Future<List<ForumSpace>> spaces() async {
-    final Map<String, dynamic> data = await _api.get('/api/forums', authenticated: false);
+    // WITH the session, always.
+    //
+    // `/api/forums` returns `can_read` and `can_post` computed for the person
+    // asking. Asking anonymously meant a signed-in member was told they could
+    // not read the members-only spaces — the cards drew greyed out and the tap
+    // did nothing, so the forums looked broken to exactly the people they are
+    // for. `authenticated: true` attaches the token only when there is one, so
+    // a visitor still gets the visitor's answer.
+    final Map<String, dynamic> data = await _api.get('/api/forums');
     return (data['items'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
         .map(ForumSpace.fromJson)

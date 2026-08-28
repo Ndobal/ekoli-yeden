@@ -149,7 +149,13 @@ class MemberShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool wide = context.screenWidth >= Breakpoints.laptop;
+    // The sidebar is open by default on anything desktop-shaped.
+    //
+    // `Breakpoints.laptop` is 1240, which is wider than a great many laptops
+    // actually are — a 1366 screen with the browser not maximised falls under
+    // it, and the member got a hamburger on a desktop. `tablet` (905) is the
+    // point at which a 262px sidebar still leaves a usable column beside it.
+    final bool wide = context.screenWidth >= Breakpoints.tablet;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDeep,
@@ -167,6 +173,10 @@ class MemberShell extends StatelessWidget {
               backgroundColor: AppColors.navy,
               child: _Sidebar(currentPath: currentPath, closeOnTap: true),
             ),
+      // On a phone the four most-used tools sit under the thumb, and `More`
+      // opens the rest as the app drawer. A member on a phone should not have
+      // to find a hamburger to answer a message.
+      bottomNavigationBar: wide ? null : const _BottomBar(),
       body: SeoHead(
         // A member's own dashboard is never indexed.
         metadata: SeoMetadata(title: '$title · Ekoli-Yeden', noIndex: true),
@@ -201,6 +211,113 @@ class MemberShell extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The bottom bar — phones only
+// ---------------------------------------------------------------------------
+
+/// The four things a member reaches for most, plus a door to everything else.
+///
+/// Four and not five: the fifth slot is `More`, and a bottom bar that is all
+/// destinations and no overflow either hides the rest of the product or grows
+/// until the labels are unreadable.
+///
+/// `More` opens the same sidebar as the drawer, so there is one list of the
+/// member's tools rather than two that drift apart.
+const List<MemberNavItem> _bottomBarItems = <MemberNavItem>[
+  MemberNavItem(label: 'Home', path: AppRoutes.account, icon: Icons.dashboard_outlined),
+  MemberNavItem(label: 'Jobs', path: AppRoutes.opportunities, icon: Icons.work_outline),
+  MemberNavItem(
+    label: 'Messages',
+    path: AppRoutes.messages,
+    icon: Icons.forum_outlined,
+    badgeKey: 'messages',
+  ),
+  MemberNavItem(label: 'People', path: AppRoutes.directory, icon: Icons.contacts_outlined),
+];
+
+class _BottomBar extends StatefulWidget {
+  const _BottomBar();
+
+  @override
+  State<_BottomBar> createState() => _BottomBarState();
+}
+
+class _BottomBarState extends State<_BottomBar> {
+  int _unread = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _poll = Timer.periodic(const Duration(seconds: 45), (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted || !context.read<AuthController>().isSignedIn) return;
+    try {
+      final int unread = await context.read<MessageRepository>().unread();
+      if (mounted) setState(() => _unread = unread);
+    } catch (_) {
+      // A badge is not worth an error state.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final String location = GoRouterState.of(context).uri.path;
+
+    int selected = _bottomBarItems.length; // `More`, when nothing else matches.
+    for (int i = 0; i < _bottomBarItems.length; i++) {
+      final String path = _bottomBarItems[i].path;
+      final bool hit = path == AppRoutes.account
+          ? location == AppRoutes.account
+          : location == path || location.startsWith('$path/');
+      if (hit) {
+        selected = i;
+        break;
+      }
+    }
+
+    return NavigationBar(
+      selectedIndex: selected,
+      backgroundColor: theme.colorScheme.surface,
+      indicatorColor: AppColors.navy.withValues(alpha: 0.12),
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      height: 66,
+      onDestinationSelected: (int index) {
+        if (index == _bottomBarItems.length) {
+          Scaffold.of(context).openDrawer();
+          return;
+        }
+        context.go(_bottomBarItems[index].path);
+      },
+      destinations: <Widget>[
+        for (final MemberNavItem item in _bottomBarItems)
+          NavigationDestination(
+            icon: item.badgeKey == 'messages' && _unread > 0
+                ? Badge.count(count: _unread, child: Icon(item.icon))
+                : Icon(item.icon),
+            selectedIcon: Icon(item.icon, color: AppColors.navy),
+            label: item.label,
+          ),
+        const NavigationDestination(
+          icon: Icon(Icons.menu),
+          selectedIcon: Icon(Icons.menu, color: AppColors.navy),
+          label: 'More',
+        ),
+      ],
     );
   }
 }
@@ -507,7 +624,7 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AuthController auth = context.watch<AuthController>();
-    final bool wide = context.screenWidth >= Breakpoints.laptop;
+    final bool wide = context.screenWidth >= Breakpoints.tablet;
 
     if (!wide) return const SizedBox.shrink();
 

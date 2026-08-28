@@ -13,6 +13,9 @@ import '../../core/widgets/async_content.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../models/member.dart';
+import '../../models/message.dart';
+import '../../repositories/message_repository.dart';
+import '../../core/errors/app_exception.dart';
 import '../../repositories/member_repository.dart';
 import '../../services/auth/auth_controller.dart';
 
@@ -179,10 +182,204 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ],
               ),
+            ] else ...<Widget>[
+              const Gap.xl(),
+              _ProfileActions(profile: profile),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// WRITING TO SOMEBODY WITHOUT BEING GIVEN THEIR NUMBER.
+///
+/// The point of the whole arrangement: you can find a person, read their public
+/// page and start a conversation, and none of that reveals a phone number or an
+/// email address. The message goes through this platform.
+///
+/// Their details move only one way — they grant them. So the second button
+/// asks, with a reason attached, and the answer is theirs. A refusal is final,
+/// which is what makes agreeing mean something.
+class _ProfileActions extends StatefulWidget {
+  const _ProfileActions({required this.profile});
+
+  final MemberProfile profile;
+
+  @override
+  State<_ProfileActions> createState() => _ProfileActionsState();
+}
+
+class _ProfileActionsState extends State<_ProfileActions> {
+  bool _busy = false;
+  String? _asked;
+
+  Future<void> _message() async {
+    setState(() => _busy = true);
+    try {
+      final Conversation conversation =
+          await context.read<MessageRepository>().open(handle: widget.profile.handle);
+      if (mounted) context.go(AppRoutes.conversation(conversation.id));
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _askForContact() async {
+    final String? reason = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => _ContactRequestDialog(name: widget.profile.name),
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final String message = await context.read<MessageRepository>().requestContact(
+            handle: widget.profile.handle,
+            reason: reason,
+          );
+      if (mounted) setState(() => _asked = message);
+    } on AppException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final MemberProfile profile = widget.profile;
+
+    if (_asked != null) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: AppRadius.mdAll,
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.schedule, color: Colors.white, size: 18),
+            const Gap.hMd(),
+            Expanded(
+              child: Text(
+                _asked!,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: AppSpacing.md,
+      runSpacing: AppSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        FilledButton.icon(
+          onPressed: _busy ? null : _message,
+          icon: const Icon(Icons.mail_outline, size: 18),
+          label: const Text('Send a message'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.goldLight,
+            foregroundColor: AppColors.ink,
+          ),
+        ),
+
+        // Only when there is something to ask for. Somebody who has published
+        // their number needs no request, and somebody who has already granted
+        // it to this viewer should not be asked twice.
+        if (profile.contactHidden && !profile.contactSharedWithMe)
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _askForContact,
+            icon: const Icon(Icons.phone_outlined, size: 18, color: Colors.white),
+            label: const Text(
+              'Ask for contact details',
+              style: TextStyle(color: Colors.white),
+            ),
+            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white54)),
+          ),
+
+        if (profile.contactSharedWithMe)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.lock_open_outlined, size: 16, color: AppColors.goldLight),
+              const Gap.hSm(),
+              Text(
+                'They have shared their details with you',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ContactRequestDialog extends StatefulWidget {
+  const _ContactRequestDialog({required this.name});
+
+  final String name;
+
+  @override
+  State<_ContactRequestDialog> createState() => _ContactRequestDialogState();
+}
+
+class _ContactRequestDialogState extends State<_ContactRequestDialog> {
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Ask ${widget.name} for their details'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'They will see who is asking and why, and can say yes or no. Nothing of theirs is '
+            'shared unless they agree — and you can talk to them here in the meantime.',
+          ),
+          const Gap.lg(),
+          TextField(
+            controller: _reason,
+            maxLength: 300,
+            maxLines: 3,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Why you are asking',
+              hintText: 'For example: I would like to call you about the farm co-operative.',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_reason.text.trim()),
+          child: const Text('Send the request'),
+        ),
+      ],
     );
   }
 }

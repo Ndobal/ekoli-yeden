@@ -51,6 +51,8 @@ class MemberProfile {
     this.workGroup,
     this.workGroupLabel,
     this.openToOpportunities = false,
+    this.contactHidden = true,
+    this.contactSharedWithMe = false,
     this.openToMentoring = false,
     this.mentoringNote,
     this.birthYear,
@@ -112,6 +114,8 @@ class MemberProfile {
       workGroup: Json.strOrNull(json, 'work_group'),
       workGroupLabel: Json.strOrNull(json, 'work_group_label'),
       openToOpportunities: Json.boolVal(json, 'open_to_opportunities'),
+      contactHidden: Json.boolVal(json, 'contact_hidden', fallback: true),
+      contactSharedWithMe: Json.boolVal(json, 'contact_shared_with_me'),
       openToMentoring: Json.boolVal(json, 'open_to_mentoring'),
       mentoringNote: Json.strOrNull(json, 'mentoring_note'),
       birthYear: Json.intOrNull(json, 'birth_year'),
@@ -213,6 +217,15 @@ class MemberProfile {
   final String? workGroupLabel;
 
   final bool openToOpportunities;
+
+  /// True when this person's phone and email are both withheld from the viewer.
+  ///
+  /// The server decides this, per viewer, on every read — it is never cached,
+  /// so withdrawing a grant takes effect on the next page load.
+  final bool contactHidden;
+
+  /// True when they have granted THIS viewer their details.
+  final bool contactSharedWithMe;
 
   /// §14 — willing to mentor young people from Ekori.
   ///
