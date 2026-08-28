@@ -1,5 +1,5 @@
 import type { RouteDefinition } from '../types/api';
-import { requirePermission } from '../middleware/auth';
+import { requireAnyPermission, requirePermission } from '../middleware/auth';
 import {
   addNewsMedia,
   addNewsSource,
@@ -82,11 +82,23 @@ export const newsRoutes: RouteDefinition[] = [
   },
 
   // --- Editorial -----------------------------------------------------------
+  // The newsroom's own three doors.
+  //
+  // `news:update` alone was the wrong guard here. The bridge in
+  // `acceptedPermissionsFor` maps `news:update` onto `content.edit`, which the
+  // Writer and the Editor hold — and the Reviewer and the Publisher do not.
+  // A Reviewer therefore could not open the queue they exist to work, and the
+  // Publisher was stopped at the door of the very endpoint that publishes, so
+  // the `news:publish` check inside it could never be reached at all.
+  //
+  // Reaching the newsroom and acting inside it are separate questions. These
+  // routes ask the first; `setNewsState` still asks the second before anything
+  // becomes public.
   {
     method: 'GET',
     path: '/api/editorial/news-list',
     handler: editorialList,
-    middleware: [requirePermission('news:update')],
+    middleware: [requireAnyPermission(['news:update', 'news:review', 'news:publish'])],
     description: 'Every story, whatever its state, with the counts for the tabs',
   },
   {
@@ -116,7 +128,7 @@ export const newsRoutes: RouteDefinition[] = [
     method: 'POST',
     path: '/api/editorial/news/:id/state',
     handler: setNewsState,
-    middleware: [requirePermission('news:update')],
+    middleware: [requireAnyPermission(['news:update', 'news:review', 'news:publish'])],
     description: 'Submit, approve, request changes, publish, schedule, archive or reject',
   },
   {
@@ -172,7 +184,7 @@ export const newsRoutes: RouteDefinition[] = [
     method: 'GET',
     path: '/api/editorial/news/:identifier',
     handler: editorialShow,
-    middleware: [requirePermission('news:update')],
+    middleware: [requireAnyPermission(['news:update', 'news:review', 'news:publish'])],
     description: 'One story to edit or preview, whatever its state',
   },
   {
