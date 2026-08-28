@@ -46,6 +46,7 @@ class _DirectoryPageState extends State<DirectoryPage> {
   final TextEditingController _search = TextEditingController();
   String? _professionId;
   String? _country;
+  bool _mentoringOnly = false;
   int _page = 1;
   int _reloads = 0;
 
@@ -142,6 +143,21 @@ class _DirectoryPageState extends State<DirectoryPage> {
                     onSelected: (bool _) => setState(() {
                       _professionId = null;
                       _country = null;
+                      _mentoringOnly = false;
+                      _page = 1;
+                      _reloads += 1;
+                    }),
+                  ),
+                  // §14. Kept beside the profession and country filters rather
+                  // than hidden in a menu: a student looking for somebody to
+                  // ask should find this on the first screen.
+                  FilterChip(
+                    selected: _mentoringOnly,
+                    showCheckmark: false,
+                    avatar: const Icon(Icons.volunteer_activism_outlined, size: 15),
+                    label: const Text('Willing to mentor'),
+                    onSelected: (bool _) => setState(() {
+                      _mentoringOnly = !_mentoringOnly;
                       _page = 1;
                       _reloads += 1;
                     }),
@@ -186,6 +202,7 @@ class _DirectoryPageState extends State<DirectoryPage> {
                 query: _search.text.trim().isEmpty ? null : _search.text.trim(),
                 professionId: _professionId,
                 country: _country,
+                mentoringOnly: _mentoringOnly,
               ),
               loadingMessage: 'Looking…',
               isEmpty: (PaginatedResult<MemberProfile> r) => r.isEmpty,

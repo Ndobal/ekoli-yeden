@@ -6,7 +6,7 @@ import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository
 import { permissionForStatus } from '../services/permissions';
 import { hasPermission } from '../services/auth.service';
 import { ALL_CONTENT_STATUSES, type ContentStatus } from '../types/models';
-import { ForbiddenError, UnauthorizedError } from '../utils/errors';
+import { ForbiddenError, UnauthorizedError, ValidationError } from '../utils/errors';
 import { publicMediaUrl } from '../utils/files';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, paginated, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
@@ -135,6 +135,27 @@ export function adminChangeStatus(resource: ContentResource): Handler {
 
     const id = context.params['id'] ?? '';
     const service = new ContentService(context.env.DB, resource);
+
+    // An oral history recording is a named living person, often elderly,
+    // speaking about their own family. Before it becomes public the archive has
+    // to be able to say who agreed to that.
+    //
+    // The check lives at publication and not on the form, because a recording
+    // should be transcribable, reviewable and discussable while the consent
+    // conversation is still happening. What must not happen is that it slips
+    // out while nobody can say whether the speaker was asked.
+    if (resource.key === 'recordings' && (target === 'published' || target === 'approved')) {
+      const existing = await service.findOne(id, true);
+      const consent = existing?.['consent_reference'];
+      if (typeof consent !== 'string' || consent.trim().length === 0) {
+        throw new ValidationError(
+          { consent_reference: ['Required before an oral history recording can be published.'] },
+          'This recording has no consent reference. Record who agreed to it being published, '
+          + 'and what they agreed to, before approving it.',
+        );
+      }
+    }
+
     const updated = await service.changeStatus(
       id,
       target,
@@ -207,6 +228,21 @@ function validateCommonFields(resource: ContentResource, body: Record<string, un
   if ('website_url' in body && body['website_url']) validator.url('website_url');
   if ('youtube_video_id' in body) {
     validator.youtubeVideoId('youtube_video_id', { required: resource.key === 'videos' });
+  }
+  // A recording is film, or audio, or both — the table's own CHECK says so.
+  // Caught here as well so the person filling the form is told which field is
+  // missing rather than being handed a constraint failure.
+  if (resource.key === 'recordings' && ('youtube_video_id' in body || 'audio_media_id' in body)) {
+    const film = body['youtube_video_id'];
+    const audio = body['audio_media_id'];
+    const hasFilm = typeof film === 'string' && film.trim().length > 0;
+    const hasAudio = typeof audio === 'string' && audio.trim().length > 0;
+    if (!hasFilm && !hasAudio) {
+      throw new ValidationError(
+        { audio_media_id: ['Add a YouTube film or an audio recording.'] },
+        'A recording needs either a film or an audio file.',
+      );
+    }
   }
   // A dictionary word is often several parts of speech at once — a noun and a
   // verb — so the column holds a JSON array. Accepted from the client as a real

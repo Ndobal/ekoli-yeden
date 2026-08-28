@@ -353,6 +353,47 @@ class _SideColumn extends StatelessWidget {
                   ),
                 ),
               ],
+
+              // §14 — the offer to mentor. Given more room than the line above
+              // because it is an offer being made to the community rather than
+              // a preference being recorded, and because the note explains what
+              // this person can actually help with.
+              if (profile.openToMentoring) ...<Widget>[
+                const Gap.lg(),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.10),
+                    borderRadius: AppRadius.smAll,
+                    border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Icon(Icons.volunteer_activism_outlined,
+                          size: 16, color: AppColors.goldDark),
+                      const Gap.hMd(),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Willing to mentor young people from Ekori',
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if ((profile.mentoringNote ?? '').isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 2),
+                              Text(profile.mentoringNote!,
+                                  style: theme.textTheme.bodySmall),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

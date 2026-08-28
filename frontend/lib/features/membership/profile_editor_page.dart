@@ -110,6 +110,8 @@ class _EditorState extends State<_Editor> {
   String? _educationLevel;
   String? _employmentStatus;
   bool _openToOpportunities = false;
+  bool _openToMentoring = false;
+  final TextEditingController _mentoringNote = TextEditingController();
 
   late List<MemberSkillEntry> _skills;
   late Set<String> _interests;
@@ -148,6 +150,8 @@ class _EditorState extends State<_Editor> {
     _educationLevel = p.educationLevel;
     _employmentStatus = p.employmentStatus;
     _openToOpportunities = p.openToOpportunities;
+    _openToMentoring = p.openToMentoring;
+    _mentoringNote.text = p.mentoringNote ?? '';
 
     _skills = p.skills
         .map(
@@ -163,6 +167,7 @@ class _EditorState extends State<_Editor> {
 
   @override
   void dispose() {
+    _mentoringNote.dispose();
     for (final TextEditingController controller in <TextEditingController>[
       _fullName, _headline, _bio, _phone, _whatsapp, _country, _state, _lga,
       _community, _city, _placeText, _clan, _connectionNote, _professionOther,
@@ -464,6 +469,8 @@ class _EditorState extends State<_Editor> {
             await _repository.updateProfile(<String, dynamic>{
               'employment_status': _employmentStatus,
               'open_to_opportunities': _openToOpportunities,
+              'open_to_mentoring': _openToMentoring,
+              'mentoring_note': _mentoringNote.text.trim(),
             });
           }),
           child: Column(
@@ -499,6 +506,35 @@ class _EditorState extends State<_Editor> {
                   'hear about a scholarship.',
                 ),
               ),
+
+              // §14 of the proposal. The opposite direction to the switch
+              // above: that one asks what you would like to receive, this one
+              // offers what you are willing to give.
+              SwitchListTile(
+                value: _openToMentoring,
+                onChanged: (bool value) => setState(() => _openToMentoring = value),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('I am willing to mentor young people from Ekori'),
+                subtitle: const Text(
+                  'Shown on your profile and searchable in the directory, so a student from '
+                  'Ekori can find somebody doing what they want to do.',
+                ),
+              ),
+              if (_openToMentoring) ...<Widget>[
+                const Gap.sm(),
+                TextFormField(
+                  controller: _mentoringNote,
+                  maxLength: 400,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'What you can help with',
+                    hintText:
+                        'For example: choosing a course, applying to university abroad, '
+                        'getting started in nursing, or writing a first CV.',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

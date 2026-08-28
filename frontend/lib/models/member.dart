@@ -51,6 +51,8 @@ class MemberProfile {
     this.workGroup,
     this.workGroupLabel,
     this.openToOpportunities = false,
+    this.openToMentoring = false,
+    this.mentoringNote,
     this.birthYear,
     this.profileVisibility = 'members',
     this.showContact = false,
@@ -110,6 +112,8 @@ class MemberProfile {
       workGroup: Json.strOrNull(json, 'work_group'),
       workGroupLabel: Json.strOrNull(json, 'work_group_label'),
       openToOpportunities: Json.boolVal(json, 'open_to_opportunities'),
+      openToMentoring: Json.boolVal(json, 'open_to_mentoring'),
+      mentoringNote: Json.strOrNull(json, 'mentoring_note'),
       birthYear: Json.intOrNull(json, 'birth_year'),
       profileVisibility: Json.str(json, 'profile_visibility', fallback: 'members'),
       showContact: Json.boolVal(json, 'show_contact'),
@@ -209,6 +213,17 @@ class MemberProfile {
   final String? workGroupLabel;
 
   final bool openToOpportunities;
+
+  /// §14 — willing to mentor young people from Ekori.
+  ///
+  /// The opposite direction to [openToOpportunities]: that field says this
+  /// person would like to hear about work, this one says they will give their
+  /// time to somebody younger. A member may well set one and not the other.
+  final bool openToMentoring;
+
+  /// What they can help with, in their own words. The server drops it when
+  /// [openToMentoring] is off, so a stale sentence cannot linger on a profile.
+  final String? mentoringNote;
 
   /// Only ever present on your own profile.
   final int? birthYear;

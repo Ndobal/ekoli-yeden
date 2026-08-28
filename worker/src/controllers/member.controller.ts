@@ -219,6 +219,15 @@ export async function updateMyProfile(context: RequestContext): Promise<Response
   }
   if ('open_to_opportunities' in body) validator.boolean('open_to_opportunities');
 
+  // §14 of the proposal. Kept separate from `open_to_opportunities`: that one
+  // says this person would like to hear about work, and this one says they are
+  // willing to give their time to somebody younger. They are opposite
+  // directions and a member may well set one and not the other.
+  if ('open_to_mentoring' in body) validator.boolean('open_to_mentoring');
+  if ('mentoring_note' in body) {
+    validator.string('mentoring_note', { max: 400, label: 'What you can help with' });
+  }
+
   const validated = validator.validated();
 
   const service = new MembershipService(context.env);
@@ -443,6 +452,8 @@ export async function searchDirectory(context: RequestContext): Promise<Response
     country: context.query.get('country'),
     stateRegion: context.query.get('state'),
     employmentStatus: context.query.get('employment'),
+    // ?mentoring=1 — the members who have offered to help somebody younger.
+    mentoringOnly: context.query.get('mentoring') === '1',
     limit: perPage,
     offset,
   });

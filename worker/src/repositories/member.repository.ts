@@ -599,6 +599,8 @@ export class MemberRepository {
     country?: string | null;
     stateRegion?: string | null;
     employmentStatus?: string | null;
+    /** §14 — only members who have offered to mentor. */
+    mentoringOnly?: boolean;
     limit: number;
     offset: number;
   }): Promise<{ items: MemberProfileRecord[]; total: number }> {
@@ -641,6 +643,9 @@ export class MemberRepository {
                  WHERE ms."profile_id" = p."id" AND ms."skill_id" = ?)`,
       );
       bindings.push(options.skillId);
+    }
+    if (options.mentoringOnly) {
+      conditions.push('p."open_to_mentoring" = 1');
     }
 
     const where = conditions.join(' AND ');

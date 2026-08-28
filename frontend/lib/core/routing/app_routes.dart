@@ -48,6 +48,25 @@ class AppRoutes {
   static const String organizations = '/organizations';
   static const String contribute = '/contribute';
 
+  // --- The last sections of the proposal to be built -----------------------
+
+  /// §8 — the oral history archive.
+  static const String voices = '/voices';
+
+  /// §18 — folktales and the long tellings. Proverbs, riddles and praise names
+  /// stay in the language section, where they can carry their pronunciation.
+  static const String stories = '/stories';
+
+  /// §17 — the children's area. `/learn` rather than `/children`, because it is
+  /// named for what somebody does there rather than for who they are.
+  static const String learn = '/learn';
+
+  /// §16 — the map.
+  static const String map = '/discover';
+
+  /// §13 — the Hall of Fame, shown only when the community switches it on.
+  static const String hallOfFame = '/hall-of-fame';
+
   /// Sending in news.
   ///
   /// A form of its own rather than the general contribution page: news has a
@@ -174,6 +193,9 @@ class AppRoutes {
   static const String editorialLeboku = '/editorial/leboku';
   static const String editorialPeople = '/editorial/people';
   static const String editorialNews = '/editorial/news';
+  static const String editorialVoices = '/editorial/voices';
+  static const String editorialStories = '/editorial/stories';
+  static const String editorialQuizzes = '/editorial/quizzes';
 
   /// The composer, for a story that does not exist yet.
   static const String editorialNewsCompose = '/editorial/news/compose';
@@ -235,6 +257,9 @@ class AppRoutes {
   static String event(String slug) => '$events/$slug';
   static String galleryAlbum(String slug) => '$gallery/$slug';
   static String video(String slug) => '$videos/$slug';
+  static String voice(String slug) => '$voices/$slug';
+  static String story(String slug) => '$stories/$slug';
+  static String quiz(String slug) => '$learn/$slug';
   static String business(String slug) => '$businesses/$slug';
   static String organization(String slug) => '$organizations/$slug';
   static String project(String slug) => '$community/$slug';
@@ -389,6 +414,26 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
     description: 'Lekoli Boku and the festivals of Ekoli-Yeden',
   ),
   NavItem(label: 'People', path: AppRoutes.people, description: 'People of Ekoli-Yeden'),
+  NavItem(
+    label: 'Voices',
+    path: AppRoutes.voices,
+    description: 'Elders and others, recorded in their own words',
+  ),
+  NavItem(
+    label: 'Stories',
+    path: AppRoutes.stories,
+    description: 'Folktales and the long tellings',
+  ),
+  NavItem(
+    label: 'Discover',
+    path: AppRoutes.map,
+    description: 'The wards, quarters and landmarks of Ekori',
+  ),
+  NavItem(
+    label: 'For children',
+    path: AppRoutes.learn,
+    description: 'Learn about Ekori — greetings, numbers and quizzes',
+  ),
   NavItem(label: 'News', path: AppRoutes.news, description: 'Community news and announcements'),
   NavItem(
     label: 'Gallery',
@@ -468,6 +513,21 @@ const List<NavItem> editorialNavigation = <NavItem>[
     path: AppRoutes.editorialWordSubmissions,
     description: 'Dictionary entries sent in by the community',
   ),
+  NavItem(
+    label: 'Voices of Ekori',
+    path: AppRoutes.editorialVoices,
+    description: 'Oral history recordings, transcripts and consent',
+  ),
+  NavItem(
+    label: 'Stories',
+    path: AppRoutes.editorialStories,
+    description: 'Folktales and the long tellings',
+  ),
+  NavItem(
+    label: 'Quizzes',
+    path: AppRoutes.editorialQuizzes,
+    description: 'The children’s learning area',
+  ),
   NavItem(label: 'Sources', path: AppRoutes.editorialSources, description: 'The citation library'),
 ];
 
@@ -485,6 +545,9 @@ const Map<String, ({String resource, String title})> editorialContentScreens =
   AppRoutes.editorialGallery: (resource: 'galleries', title: 'Gallery'),
   AppRoutes.editorialVideos: (resource: 'videos', title: 'Videos'),
   AppRoutes.editorialCommunity: (resource: 'community', title: 'Community projects'),
+  AppRoutes.editorialVoices: (resource: 'recordings', title: 'Voices of Ekori'),
+  AppRoutes.editorialStories: (resource: 'stories', title: 'Stories and folklore'),
+  AppRoutes.editorialQuizzes: (resource: 'quizzes', title: 'Quizzes'),
 };
 
 /// The Super Admin sidebar. Administration only — a different interface.

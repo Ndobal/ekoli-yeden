@@ -172,6 +172,8 @@ class MemberRepository {
     String? professionId,
     String? country,
     String? employmentStatus,
+    /// §14 — only members who have offered to mentor.
+    bool mentoringOnly = false,
   }) {
     return _api.list<MemberProfile>(
       '/api/directory',
@@ -183,6 +185,7 @@ class MemberRepository {
         'profession': ?professionId,
         'country': ?country,
         'employment': ?employmentStatus,
+        if (mentoringOnly) 'mentoring': '1',
       },
     );
   }

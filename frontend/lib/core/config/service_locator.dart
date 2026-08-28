@@ -23,6 +23,7 @@ import '../../repositories/news_repository.dart';
 import '../../repositories/opportunity_repository.dart';
 import '../../repositories/people_repository.dart';
 import '../../repositories/place_repository.dart';
+import '../../repositories/discover_repository.dart';
 import '../../repositories/remembrance_repository.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/submission_repository.dart';
@@ -72,6 +73,8 @@ class ServiceLocator {
       Provider<RemembranceRepository>(create: (_) => RemembranceRepository(api)),
       Provider<PeopleRepository>(create: (_) => PeopleRepository(api)),
       Provider<PlaceRepository>(create: (_) => PlaceRepository(api)),
+      // Voices of Ekori, the map, the Hall of Fame and the children's quizzes.
+      Provider<DiscoverRepository>(create: (_) => DiscoverRepository(api)),
       Provider<AgeGradeRepository>(create: (_) => AgeGradeRepository(api)),
       Provider<MemberRepository>(create: (_) => MemberRepository(api)),
       Provider<MessageRepository>(create: (_) => MessageRepository(api)),

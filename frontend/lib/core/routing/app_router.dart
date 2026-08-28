@@ -47,6 +47,11 @@ import '../../features/news/contribute_news_page.dart';
 import '../../features/news/news_article_page.dart';
 import '../../features/news/news_portal_page.dart';
 import '../../features/people/people_pages.dart';
+import '../../features/voices/voices_pages.dart';
+import '../../features/stories/stories_pages.dart';
+import '../../features/learn/learn_pages.dart';
+import '../../features/discover/map_page.dart';
+import '../../features/people/hall_of_fame_page.dart';
 import '../../features/people/person_profile_page.dart';
 import '../../features/places/places_pages.dart';
 import '../../features/search/search_page.dart';
@@ -367,6 +372,59 @@ GoRouter buildRouter(AuthController auth) {
           ),
         ],
       ),
+      // --- The last sections of the proposal --------------------------------
+      //
+      // §8 — Voices of Ekori.
+      GoRoute(
+        path: AppRoutes.voices,
+        builder: (_, _) => const VoicesPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                VoicePage(slug: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+
+      // §18 — folktales and the long tellings.
+      GoRoute(
+        path: AppRoutes.stories,
+        builder: (_, _) => const StoriesPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                StoryPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+
+      // §17 — the children's area. `:slug` is a quiz.
+      GoRoute(
+        path: AppRoutes.learn,
+        builder: (_, _) => const LearnPage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':slug',
+            builder: (_, GoRouterState state) =>
+                QuizPage(slug: state.pathParameters['slug']!),
+          ),
+        ],
+      ),
+
+      // §16 — the map.
+      GoRoute(
+        path: AppRoutes.map,
+        builder: (_, _) => const DiscoverMapPage(),
+      ),
+
+      // §13 — the Hall of Fame, which decides for itself whether it is open.
+      GoRoute(
+        path: AppRoutes.hallOfFame,
+        builder: (_, _) => const HallOfFamePage(),
+      ),
+
       GoRoute(
         path: AppRoutes.businesses,
         builder: (_, _) => const BusinessesListPage(),

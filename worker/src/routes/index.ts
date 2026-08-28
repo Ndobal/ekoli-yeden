@@ -8,6 +8,7 @@ import { adminRoutes } from './admin.routes';
 import { ageGradeRoutes } from './age-grade.routes';
 import { membershipRoutes } from './membership.routes';
 import { kinshipRoutes, publicKinshipRoutes } from './kinship.routes';
+import { discoverRoutes } from './discover.routes';
 import { groupRoutes } from './group.routes';
 import { opportunityRoutes } from './opportunity.routes';
 import { forumRoutes } from './forum.routes';
@@ -67,6 +68,10 @@ export function buildRouter(): Router {
   // Before the generated public routes: `/api/news-portal` must not be read as
   // a content resource named "news-portal".
   router.registerAll(newsRoutes);
+  // Before the generated public routes, for the same reason as the news portal:
+  // `/api/map/places` and `/api/learn/quizzes/:identifier` must not be read as
+  // content resources named "map" and "learn".
+  router.registerAll(discoverRoutes);
   router.registerAll(publicRoutes);
 
   return router;
@@ -89,5 +94,6 @@ export const allRoutes: RouteDefinition[] = [
   ...contactRoutes,
   ...messagingRoutes,
   ...newsRoutes,
+  ...discoverRoutes,
   ...publicRoutes,
 ];

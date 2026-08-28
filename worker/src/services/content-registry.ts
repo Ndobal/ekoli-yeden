@@ -273,6 +273,100 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     searchable: true,
   },
 
+  // -------------------------------------------------------------------------
+  // §18 of the proposal — folktales and the long tellings.
+  //
+  // Proverbs, riddles, praise names and songs are dictionary entries: they are
+  // short, they need a pronunciation, and they belong beside the words. A
+  // folktale is not. It is a piece of prose with a beginning and an end, and
+  // squeezing it into a dictionary row would lose the telling.
+  //
+  // So a story is an article, in the shared `content_items` table beside
+  // `culture`, discriminated by `content_type`. That column carries no CHECK
+  // constraint precisely so a new kind of article costs nothing.
+  // -------------------------------------------------------------------------
+  stories: {
+    key: 'stories',
+    table: 'content_items',
+    label: 'Story',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'cover_media_id',
+      'seo_title', 'seo_description', 'seo_image_media_id', 'sort_order',
+      'verification_status', 'research_edition', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'subtitle', 'excerpt', 'body', 'category'],
+    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
+    managedBy: HERITAGE,
+    hasVerification: true,
+    searchable: true,
+    fixedFilters: { content_type: 'story' },
+  },
+
+  // -------------------------------------------------------------------------
+  // §8 of the proposal — VOICES OF EKORI.
+  //
+  // Managed by the Heritage Editor rather than the Media Manager, though it
+  // holds film and audio. What makes an oral history hard is not the file: it
+  // is knowing whether the speaker agreed, whether the transcript is faithful,
+  // and whether an interpretation has quietly replaced somebody's words. Those
+  // are heritage judgements.
+  //
+  // `consent_reference` is writable here, and `publishRecording` in the
+  // controller refuses to publish without it.
+  // -------------------------------------------------------------------------
+  recordings: {
+    key: 'recordings',
+    table: 'recordings',
+    label: 'Recording',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'summary', 'speaker', 'speaker_role', 'speaker_place_id',
+      'youtube_video_id', 'audio_media_id', 'transcript', 'transcript_language',
+      'english_interpretation', 'interpreted_by', 'topic',
+      'recorded_at', 'recorded_location', 'recorded_by', 'duration_seconds',
+      'consent_reference', 'consent_note', 'cover_media_id', 'is_featured',
+      'sort_order', 'seo_title', 'seo_description', 'verification_status', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'summary', 'speaker', 'transcript', 'english_interpretation'],
+    sortableColumns: ['title', 'recorded_at', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'recorded_at',
+    defaultOrder: 'DESC',
+    managedBy: HERITAGE,
+    hasVerification: true,
+    searchable: true,
+  },
+
+  // -------------------------------------------------------------------------
+  // §17 of the proposal — the children's area.
+  //
+  // The quiz record itself. Its questions and options are handled by
+  // `quiz.controller.ts`, because a quiz is only meaningful with them and the
+  // generated CRUD routes cannot nest.
+  // -------------------------------------------------------------------------
+  quizzes: {
+    key: 'quizzes',
+    table: 'quizzes',
+    label: 'Quiz',
+    slugColumn: 'slug',
+    writableColumns: [
+      'slug', 'title', 'description', 'subject', 'level',
+      'intro', 'closing', 'cover_media_id', 'sort_order', 'status',
+    ],
+    publicColumns: null,
+    searchableColumns: ['title', 'description', 'subject'],
+    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
+    managedBy: LANGUAGE,
+    hasVerification: false,
+    searchable: true,
+  },
+
   videos: {
     key: 'videos',
     table: 'videos',

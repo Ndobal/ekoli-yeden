@@ -81,6 +81,35 @@ const PAGES = {
       'The traditional institution and community leadership of Ekoli-Yeden, past and present, ' +
       'maintained with the traditional institution and verified before publication.',
   },
+  '/voices': {
+    title: 'Voices of Ekori',
+    description:
+      'Elders, traditional leaders and others who remember, recorded in their own words — with ' +
+      'transcripts in the language they were speaking and English interpretations beside them.',
+  },
+  '/stories': {
+    title: 'Stories and Folklore',
+    description:
+      'Folktales, children’s stories and the long tellings of Ekoli-Yeden. Proverbs, riddles ' +
+      'and praise names live in the language section, where they carry their pronunciation.',
+  },
+  '/discover': {
+    title: 'Discover Ekori',
+    description:
+      'The wards, quarters, compounds and landmarks of Ekori, and where they sit in relation to ' +
+      'one another.',
+  },
+  '/learn': {
+    title: 'Learn About Ekori',
+    description:
+      'For children of Ekori wherever they are growing up — greetings, numbers, proverbs and the ' +
+      'story of where your family comes from, with quizzes to try.',
+  },
+  '/hall-of-fame': {
+    title: 'Ekori Hall of Fame',
+    description:
+      'A permanent record of people who have contributed positively to Ekori and beyond.',
+  },
   '/people': {
     title: 'People of Ekoli-Yeden',
     description:
@@ -242,6 +271,9 @@ const DETAIL_ROUTES = {
   language: { resource: 'language', section: 'Language' },
   ancestry: { resource: 'ancestry', section: 'Ancestry Records' },
   places: { resource: 'places', section: 'The Places of Ekori' },
+  voices: { resource: 'recordings', section: 'Voices of Ekori' },
+  stories: { resource: 'stories', section: 'Stories and Folklore' },
+  learn: { resource: 'quizzes', section: 'Learn About Ekori' },
 };
 
 /**

@@ -312,6 +312,14 @@ export function visibleProfile(
   }
   shaped['open_to_opportunities'] = profile['open_to_opportunities'];
 
+  // Mentoring is an offer the member is making to the community, so it travels
+  // with the profile rather than sitting behind the contact gates. The note is
+  // only meaningful when the offer is on, and is dropped otherwise so a stale
+  // sentence from a member who has since switched it off cannot linger.
+  const mentoring = Number(profile['open_to_mentoring'] ?? 0) === 1;
+  shaped['open_to_mentoring'] = mentoring;
+  shaped['mentoring_note'] = mentoring ? profile['mentoring_note'] : null;
+
   // ---------------------------------------------------------------------
   // CONTACT DETAILS. TWO GATES, AND BOTH MUST OPEN.
   // ---------------------------------------------------------------------
