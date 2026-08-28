@@ -39,6 +39,7 @@ class ContentDetailPage extends StatelessWidget {
     this.showSource = false,
     this.showSources = false,
     this.showContributors = false,
+    this.footerBuilder,
     super.key,
   });
 
@@ -57,6 +58,11 @@ class ContentDetailPage extends StatelessWidget {
 
   /// The structured citation list from the sources table.
   final bool showSources;
+
+  /// Anything a particular resource needs beneath the standard detail, given
+  /// the loaded record. An event uses it to point at its own album; most
+  /// resources need nothing and leave it null.
+  final Widget Function(BuildContext context, ContentRecord record)? footerBuilder;
 
   /// Contributor acknowledgement.
   final bool showContributors;
@@ -77,6 +83,7 @@ class ContentDetailPage extends StatelessWidget {
         showSource: showSource,
         showSources: showSources,
         showContributors: showContributors,
+        footerBuilder: footerBuilder,
       ),
     );
   }
@@ -93,6 +100,7 @@ class _Detail extends StatelessWidget {
     required this.showSource,
     required this.showSources,
     required this.showContributors,
+    this.footerBuilder,
   });
 
   final ContentRecord record;
@@ -104,6 +112,7 @@ class _Detail extends StatelessWidget {
   final bool showSource;
   final bool showSources;
   final bool showContributors;
+  final Widget Function(BuildContext context, ContentRecord record)? footerBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +196,8 @@ class _Detail extends StatelessWidget {
               const Gap.xxl(),
               _DetailFieldList(record: record, fields: detailFields),
             ],
+
+            if (footerBuilder != null) footerBuilder!(context, record),
 
             if (showContributors) ...<Widget>[
               const Gap.xxl(),

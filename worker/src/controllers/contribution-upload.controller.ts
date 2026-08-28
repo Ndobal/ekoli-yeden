@@ -1,6 +1,11 @@
 import type { RequestContext } from '../types/api';
 import { ContributionUploadService } from '../services/contribution-upload.service';
-import { ALL_R2_FOLDERS, ALLOWED_MIME_TYPES, MAX_BYTES_BY_FOLDER } from '../utils/files';
+import {
+  ALL_R2_FOLDERS,
+  ALLOWED_MIME_TYPES,
+  MAX_BYTES_BY_FOLDER,
+  MAX_BYTES_BY_TYPE,
+} from '../utils/files';
 import { UnauthorizedError } from '../utils/errors';
 import { hashIp } from '../utils/crypto';
 import { readJsonBody, Validator } from '../utils/validation';
@@ -41,9 +46,10 @@ export async function uploadConfig(context: RequestContext): Promise<Response> {
         maxBytes: Math.min(MAX_BYTES_BY_FOLDER[folder], globalMax),
       })),
       globalMaxBytes: globalMax,
+      maxVideoBytes: MAX_BYTES_BY_TYPE['video/mp4'] ?? globalMax,
       guidance: [
-        'Photographs, documents and audio recordings are all welcome.',
-        'Videos are not uploaded — publish them on YouTube and send us the link.',
+        'Photographs, documents, audio recordings and short video are all welcome.',
+        'A video longer than a few minutes belongs on YouTube — send us the link instead.',
         'Nothing you upload appears on the website until the Preservation Team has reviewed it.',
         'Please only send material you have the right to share.',
       ],
@@ -129,25 +135,52 @@ export async function approveContribution(context: RequestContext): Promise<Resp
   if (!reviewer) throw new UnauthorizedError('Please sign in to continue.');
 
   const body = await readJsonBody(context.request).catch(() => ({}) as Record<string, unknown>);
-  const notes = new Validator(body)
+  const validated = new Validator(body)
     .string('review_notes', { max: 2000, label: 'Review notes' })
-    .validated()['review_notes'] as string | null;
+    .string('gallery_id', { max: 64, label: 'Album' })
+    .boolean('publish')
+    .validated();
 
   const service = new ContributionUploadService(context.env);
   const result = await service.approve(context.params['id'] ?? '', reviewer, {
-    notes: notes ?? null,
+    notes: (validated['review_notes'] as string | null) ?? null,
+    // Both optional. Approving on its own still only accessions the file —
+    // filing it into an album and putting it on the site are things the
+    // reviewer asks for, not things that happen to them.
+    galleryId: (validated['gallery_id'] as string | null) ?? null,
+    publish: validated['publish'] === 1 || validated['publish'] === true,
     requestId: context.requestId,
   });
 
   return json(
     {
       ...result,
-      message:
-        'Approved and copied into the archive. It is not yet on the public site — publish the ' +
-        'media item when you are ready.',
+      message: messageFor(result),
     },
     { headers: NO_STORE_HEADERS },
   );
+}
+
+/**
+ * What actually happened, said plainly.
+ *
+ * The old message told every reviewer to "publish the media item when you are
+ * ready" and gave them nowhere to do it. Seven contributed files sat approved
+ * and invisible behind that sentence.
+ */
+function messageFor(result: { published: boolean; galleryItemId: string | null }): string {
+  if (result.published && result.galleryItemId) {
+    return 'Approved, filed into the album and published. It is on the public site now.';
+  }
+  if (result.published) {
+    return 'Approved and published. It is visible at its own address, but it is not in any album '
+      + 'yet — add it to one so people can find it.';
+  }
+  if (result.galleryItemId) {
+    return 'Approved and filed into the album, still as a draft. Publish it when you are ready.';
+  }
+  return 'Approved and copied into the archive. It is not in an album and not on the public site '
+    + 'yet — until it is both, nobody outside this screen can see it.';
 }
 
 /** `POST /api/admin/contributions/:id/reject` */

@@ -12,7 +12,9 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/async_content.dart';
 import '../../core/widgets/state_views.dart';
 import '../../models/content_status.dart';
+import '../../models/gallery.dart';
 import '../../repositories/account_repository.dart';
+import '../../repositories/gallery_repository.dart';
 import '../../services/auth/auth_controller.dart';
 import '../editorial/editorial_shell.dart';
 import 'media_library_page.dart';
@@ -41,7 +43,12 @@ class _ContributionsReviewPageState extends State<ContributionsReviewPage> {
   String _status = 'pending_review';
   int _reloadToken = 0;
 
-  void _reload() => setState(() => _reloadToken += 1);
+  String? _notice;
+
+  void _reload([String? outcome]) => setState(() {
+        _reloadToken += 1;
+        _notice = outcome;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -62,10 +69,28 @@ class _ContributionsReviewPageState extends State<ContributionsReviewPage> {
                 'Files sent in by the community. They are held in a separate store from the '
                 'published archive and are not reachable by anybody outside this screen.\n\n'
                 'Approving copies a file into the archive and records the contributor — that '
-                'credit then survives every later edit. Approving is not publishing: the media '
-                'item still has to be published before a visitor can see it.',
+                'credit survives every later edit.\n\n'
+                'A file becomes visible to the public only once it is BOTH published and in an '
+                'album. Choose both when you approve, or it stays in the archive with nobody '
+                'able to see it.',
           ),
           const Gap.xl(),
+
+          // What the last decision actually did. Worth its own line, because
+          // "approved" and "on the public site" are different outcomes and the
+          // gap between them is exactly what went wrong before.
+          if (_notice != null) ...<Widget>[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: AppRadius.smAll,
+              ),
+              child: Text(_notice!, style: theme.textTheme.bodyMedium),
+            ),
+            const Gap.lg(),
+          ],
 
           Wrap(
             spacing: AppSpacing.sm,
@@ -130,7 +155,11 @@ class _ContributionRow extends StatefulWidget {
   const _ContributionRow({required this.item, required this.onReviewed});
 
   final Map<String, dynamic> item;
-  final VoidCallback onReviewed;
+
+  /// Called once a decision is made, with the API's own account of what
+  /// happened where there is one — "approved" and "on the public site" are
+  /// different outcomes and the reviewer has to be told which they got.
+  final void Function([String? outcome]) onReviewed;
 
   @override
   State<_ContributionRow> createState() => _ContributionRowState();
@@ -142,9 +171,59 @@ class _ContributionRowState extends State<_ContributionRow> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Deferred: `context.read` is not safe during initState itself.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAlbums());
+  }
+
+  @override
   void dispose() {
     _notes.dispose();
     super.dispose();
+  }
+
+  /// The album to file this into, chosen by the reviewer. Null means none —
+  /// which leaves the file accessioned but unfindable, so the interface says so
+  /// rather than letting it happen quietly.
+  String? _galleryId;
+  bool _publish = true;
+  List<AlbumSummary> _albums = const <AlbumSummary>[];
+  bool _albumsLoaded = false;
+
+  Future<void> _loadAlbums() async {
+    if (_albumsLoaded) return;
+    _albumsLoaded = true;
+    try {
+      final List<AlbumSummary> albums = await context.read<GalleryRepository>().albums();
+      if (mounted) setState(() => _albums = albums);
+    } on AppException {
+      // A failure here costs the reviewer the album picker, not the ability to
+      // approve. Silence is right: they have a decision to make either way.
+    }
+  }
+
+  Future<void> _approve() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final String message = await context.read<AccountRepository>().approveContribution(
+            Json.str(widget.item, 'id'),
+            notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            galleryId: _galleryId,
+            publish: _publish,
+          );
+      // The API's own account of what happened, shown as-is. "Approved" and
+      // "on the public site" are different outcomes and the reviewer needs to
+      // know which one they got.
+      widget.onReviewed(message);
+    } on AppException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _act(Future<void> Function(String id, {String? notes}) action) async {
@@ -287,17 +366,72 @@ class _ContributionRowState extends State<_ContributionRow> {
                 ),
               ),
               const Gap.md(),
+
+              // WHERE IT GOES.
+              //
+              // Approving used to be the whole interface, and it created a
+              // media asset that lived in the library and nowhere else — not
+              // in an album, not on the site, not even reachable at its own
+              // URL, because an unpublished asset is refused to visitors.
+              // Every contribution this archive received was lost in that gap.
+              //
+              // So the two steps that were missing are asked for here, at the
+              // moment the decision is made.
+              DropdownButtonFormField<String?>(
+                initialValue: _galleryId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Add it to which album?',
+                  isDense: true,
+                  helperText: 'A file in no album is in the archive but not on any page.',
+                ),
+                items: <DropdownMenuItem<String?>>[
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Do not file it yet'),
+                  ),
+                  ..._albums.map(
+                    (AlbumSummary album) => DropdownMenuItem<String?>(
+                      value: album.id,
+                      child: Text(album.title, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                ],
+                onChanged: _busy ? null : (String? value) => setState(() => _galleryId = value),
+              ),
+              const Gap.sm(),
+              CheckboxListTile(
+                value: _publish,
+                onChanged: _busy ? null : (bool? value) => setState(() => _publish = value ?? false),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Publish it now'),
+                subtitle: const Text(
+                  'Until this is ticked, nobody outside this screen can see the file — not even '
+                  'at its own address.',
+                ),
+              ),
+              if (_galleryId == null && _publish) ...<Widget>[
+                const Gap.xs(),
+                Text(
+                  'It will be visible at its own address but will not appear in the Gallery, '
+                  'because it is not in an album.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.warning),
+                ),
+              ],
+              const Gap.md(),
               Row(
                 children: <Widget>[
                   FilledButton(
-                    onPressed: _busy ? null : () => _act(repository.approveContribution),
+                    onPressed: _busy ? null : _approve,
                     child: _busy
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Approve & add to archive'),
+                        : const Text('Approve'),
                   ),
                   const Gap.hMd(),
                   OutlinedButton(

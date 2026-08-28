@@ -2,7 +2,15 @@ import type { RouteDefinition } from '../types/api';
 import { CONTENT_RESOURCES } from '../services/content-registry';
 import { publicList, publicShow } from '../controllers/content.controller';
 import { listFestivals, showFestival, lebokuIndex } from '../controllers/festival.controller';
-import { listWords, showWord, listCategories, showCategory } from '../controllers/language.controller';
+import { allPhotographs, showGallery, galleryAlbums } from '../controllers/gallery.controller';
+import { eventsCalendar } from '../controllers/event.controller';
+import {
+  dictionaryIndex,
+  listCategories,
+  listWords,
+  showCategory,
+  showWord,
+} from '../controllers/language.controller';
 import { publicSettings } from '../controllers/settings.controller';
 import { search, searchSources } from '../controllers/search.controller';
 import { serveFile, mediaConfig } from '../controllers/media.controller';
@@ -123,8 +131,16 @@ export const publicRoutes: RouteDefinition[] = [
   },
 
   // --- Language ------------------------------------------------------------
-  // The category routes are registered before `/api/language/:identifier` so
-  // that `categories` is never mistaken for a word id.
+  // The named routes are registered before `/api/language/:identifier` so that
+  // `categories` and `index` are never mistaken for a word id.
+  {
+    method: 'GET',
+    path: '/api/language/index',
+    handler: dictionaryIndex,
+    description:
+      'The A–Z index with counts, the parts of speech and entry types to filter by, and how much '
+      + 'of the language is recorded so far',
+  },
   {
     method: 'GET',
     path: '/api/language/categories',
@@ -169,6 +185,42 @@ export const publicRoutes: RouteDefinition[] = [
     path: '/api/leboku/:year',
     handler: showFestival,
     description: 'One Leboku edition, e.g. /api/leboku/2026',
+  },
+
+  // --- Galleries -----------------------------------------------------------
+  // Registered ahead of the generated content routes so that a gallery is
+  // returned with its photographs in it. The generated route would answer with
+  // the album's own columns and nothing inside — a page with a title and no
+  // pictures.
+  {
+    method: 'GET',
+    path: '/api/photographs',
+    handler: allPhotographs,
+    description:
+      'Every published photograph in the archive, newest first, whichever album it belongs to',
+  },
+  {
+    method: 'GET',
+    path: '/api/events/calendar',
+    handler: eventsCalendar,
+    description:
+      'Everything happening — events and festivals together — split into upcoming and past',
+  },
+
+  // Ahead of `:identifier` so the static segment wins the match. It has an
+  // extra segment and would not collide today, but a route that relies on
+  // segment counts staying put is a route waiting to break.
+  {
+    method: 'GET',
+    path: '/api/galleries/albums/index',
+    handler: galleryAlbums,
+    description: 'Every published album with a count of what it holds, for the gallery filter bar',
+  },
+  {
+    method: 'GET',
+    path: '/api/galleries/:identifier',
+    handler: showGallery,
+    description: 'One album with its photographs and their labels',
   },
 
   // --- Media ---------------------------------------------------------------

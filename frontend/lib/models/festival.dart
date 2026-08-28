@@ -167,6 +167,8 @@ class FestivalDetail {
     required this.programme,
     required this.videos,
     required this.gallery,
+    this.galleryId,
+    this.gallerySlug,
   });
 
   factory FestivalDetail.fromJson(Map<String, dynamic> json) {
@@ -178,6 +180,8 @@ class FestivalDetail {
           .toList(growable: false),
       videos: Json.objectList(json, 'videos').map(Video.fromJson).toList(growable: false),
       gallery: Json.objectList(json, 'gallery'),
+      galleryId: Json.strOrNull(json, 'gallery_id'),
+      gallerySlug: Json.strOrNull(json, 'gallery_slug'),
     );
   }
 
@@ -191,6 +195,14 @@ class FestivalDetail {
 
   /// Gallery items already joined to their media URLs by the Worker.
   final List<Map<String, dynamic>> gallery;
+
+  /// The album this edition's photographs belong to.
+  ///
+  /// Present even when the album is empty, because "this festival has an album
+  /// and nothing is in it" is a different — and more useful — thing to say than
+  /// nothing at all. It is what lets the page ask for photographs.
+  final String? galleryId;
+  final String? gallerySlug;
 
   bool get hasContent =>
       events.isNotEmpty || videos.isNotEmpty || gallery.isNotEmpty || programme.isNotEmpty;

@@ -15,6 +15,9 @@ class AppUser {
     required this.roles,
     required this.permissions,
     this.preservationTeamPosition,
+    this.isMember = false,
+    this.handle,
+    this.membershipNumber,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -26,6 +29,9 @@ class AppUser {
       roles: Json.stringList(json, 'roles'),
       permissions: Json.stringList(json, 'permissions').toSet(),
       preservationTeamPosition: Json.strOrNull(json, 'preservation_team_position'),
+      isMember: Json.boolVal(json, 'isMember'),
+      handle: Json.strOrNull(json, 'handle'),
+      membershipNumber: Json.strOrNull(json, 'membershipNumber'),
     );
   }
 
@@ -36,6 +42,24 @@ class AppUser {
   final List<String> roles;
   final Set<String> permissions;
   final String? preservationTeamPosition;
+
+  /// Whether this account has completed its Okoli membership.
+  ///
+  /// An account and a membership are not the same thing: signing up gives you
+  /// the first, and the join form gives you the second. Contributing needs the
+  /// membership, so the interface has to be able to tell them apart and send
+  /// somebody to the right place.
+  final bool isMember;
+
+  /// The member's public handle, once they have one.
+  final String? handle;
+  final String? membershipNumber;
+
+  /// Whether this account may contribute material to the archive.
+  ///
+  /// Members can. So can anybody who reviews contributions, because they are
+  /// acting for the archive rather than sending something to it.
+  bool get canContribute => isMember || can('submissions:review') || can('*');
 
   bool get isSuperAdmin => roles.contains(AppRoles.superAdmin);
 

@@ -12,6 +12,7 @@ class Formatters {
   static final DateFormat _shortDate = DateFormat('d MMM yyyy');
   static final DateFormat _dateTime = DateFormat('d MMM yyyy, HH:mm');
   static final DateFormat _monthYear = DateFormat('MMMM yyyy');
+  static final DateFormat _monthAbbrev = DateFormat('MMM');
 
   static DateTime? tryParse(String? value) {
     if (value == null || value.isEmpty) return null;
@@ -32,6 +33,9 @@ class Formatters {
     final DateTime? parsed = tryParse(value);
     return parsed == null ? fallback : _dateTime.format(parsed.toLocal());
   }
+
+  /// Just the month, abbreviated — for a date drawn as a calendar block.
+  static String monthAbbreviation(DateTime date) => _monthAbbrev.format(date).toUpperCase();
 
   static String monthYear(String? value, {String fallback = '—'}) {
     final DateTime? parsed = tryParse(value);

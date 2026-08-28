@@ -19,7 +19,15 @@ export const authRoutes: RouteDefinition[] = [
     method: 'POST',
     path: '/api/auth/register',
     handler: register,
-    middleware: [rateLimit({ scope: 'register', limit: 5, windowSeconds: 3600 })],
+    // Five an hour per address was too tight for this community. Mobile
+    // networks here put many people behind one carrier-grade NAT address, so a
+    // family or a village hall registering together would have shared a single
+    // allowance and the sixth person would have been turned away as an abuser.
+    //
+    // Twenty still stops casual scripted signup, and the real protection is
+    // Cloudflare's own rate limiting at the edge rather than this counter,
+    // which lives in one isolate's memory.
+    middleware: [rateLimit({ scope: 'register', limit: 20, windowSeconds: 3600 })],
     description: 'Create a contributor account',
   },
   {

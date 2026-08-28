@@ -13,11 +13,36 @@ import 'admin_dashboard.dart' show AdminSectionNote;
 import '../models/content_record.dart';
 import '../models/content_status.dart';
 import '../repositories/admin_repository.dart';
+import 'user_actions.dart';
 import '../services/api/api_response.dart';
 
-/// Accounts and the roles they hold.
-class AdminUsersPage extends StatelessWidget {
+/// ACCOUNTS, THE ROLES THEY HOLD, AND THE TWO WAYS BACK INTO ONE.
+///
+/// ---------------------------------------------------------------------------
+/// WHY BOTH A LINK AND A TEMPORARY PASSWORD
+/// ---------------------------------------------------------------------------
+///
+/// A reset link is the better mechanism and stays the default: no administrator
+/// ever learns anybody's password. But it assumes the person can receive and
+/// open a link, and that is not always true — an elder on a borrowed phone,
+/// somebody whose email stopped working years ago, somebody standing in front
+/// of an administrator right now.
+///
+/// So there are two. The temporary password is not a shared password: the
+/// account must replace it before it can do anything else, and every existing
+/// session on that account ends the moment it is issued. Knowing it buys
+/// exactly one thing — the right to choose a real one.
+///
+/// Both are shown once, on this screen, and never stored on this side.
+class AdminUsersPage extends StatefulWidget {
   const AdminUsersPage({super.key});
+
+  @override
+  State<AdminUsersPage> createState() => _AdminUsersPageState();
+}
+
+class _AdminUsersPageState extends State<AdminUsersPage> {
+  int _reloads = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +55,7 @@ class AdminUsersPage extends StatelessWidget {
       accent: AppColors.gold,
       navigation: adminNavigation,
       child: AsyncContent<PaginatedResult<ContentRecord>>(
+        key: ValueKey<int>(_reloads),
         load: () => context.read<AdminRepository>().users(perPage: 100),
         loadingMessage: 'Loading accounts…',
         builder: (BuildContext context, PaginatedResult<ContentRecord> result) => Column(
@@ -64,6 +90,7 @@ class AdminUsersPage extends StatelessWidget {
                       DataColumn(label: Text('Roles')),
                       DataColumn(label: Text('Status')),
                       DataColumn(label: Text('Last signed in')),
+                      DataColumn(label: Text('Actions')),
                     ],
                     rows: result.items
                         .map(
@@ -81,6 +108,15 @@ class AdminUsersPage extends StatelessWidget {
                               DataCell(
                                 Text(Formatters.relative(user.text('last_login_at'), fallback: 'never')),
                               ),
+                              DataCell(
+                                UserActions(
+                                  userId: user.text('id') ?? '',
+                                  name: user.text('display_name') ?? user.text('email') ?? '',
+                                  status: user.text('status') ?? 'active',
+                                  roles: Json.stringList(user.raw, 'roles'),
+                                  onDone: () => setState(() => _reloads += 1),
+                                ),
+                              ),
                             ],
                           ),
                         )
@@ -91,9 +127,11 @@ class AdminUsersPage extends StatelessWidget {
             const Gap.xxl(),
             const AdminSectionNote(
               message:
-                  'Accounts are created and roles assigned through the API. The forms for doing so '
-                  'from this screen are added in the next module; the endpoints exist and are '
-                  'protected by the users.manage and roles.manage permissions.',
+                  'When somebody uses "forgot password", every Super Admin is told here whether '
+                  'the link actually reached them — and if it did not, the notification carries '
+                  'the link so you can pass it on. Accounts are still created and roles assigned '
+                  'through the API; those endpoints are protected by the users.manage and '
+                  'roles.manage permissions.',
             ),
           ],
         ),

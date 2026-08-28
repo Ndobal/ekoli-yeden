@@ -2,7 +2,12 @@ import type { RequestContext } from '../types/api';
 import { MediaService } from '../services/media.service';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
 import { ALL_CONTENT_STATUSES, CONTENT_STATUS } from '../types/models';
-import { ALL_R2_FOLDERS, ALLOWED_MIME_TYPES, MAX_BYTES_BY_FOLDER } from '../utils/files';
+import {
+  ALL_R2_FOLDERS,
+  ALLOWED_MIME_TYPES,
+  MAX_BYTES_BY_FOLDER,
+  MAX_BYTES_BY_TYPE,
+} from '../utils/files';
 import { BadRequestError, UnauthorizedError } from '../utils/errors';
 import { json, paginated, NO_STORE_HEADERS } from '../utils/responses';
 import { parsePagination } from '../utils/pagination';
@@ -42,7 +47,12 @@ export async function mediaConfig(context: RequestContext): Promise<Response> {
       maxBytes: Math.min(MAX_BYTES_BY_FOLDER[folder], globalMax),
     })),
     globalMaxBytes: globalMax,
-    note: 'Videos are not uploaded. Publish the video on YouTube and record its link instead.',
+    // Video carries its own ceiling, which is larger than the folder it sits
+    // in and larger than the global figure. Reported separately so the upload
+    // form does not warn about a limit that does not apply to a clip.
+    maxVideoBytes: MAX_BYTES_BY_TYPE['video/mp4'] ?? globalMax,
+    note: 'Short video may be uploaded alongside photographs. Anything longer than a few minutes '
+      + 'belongs on YouTube — record its link instead.',
   });
 }
 

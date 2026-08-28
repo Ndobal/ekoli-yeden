@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/routing/app_routes.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../models/content_record.dart';
 import '../shared/content_detail_page.dart';
 import '../shared/content_list_page.dart';
@@ -28,9 +30,14 @@ class PeopleListPage extends StatelessWidget {
       emptyTitle: 'No profiles published yet',
       emptyMessage:
           'Profiles are added once the person, or their family, has agreed to be listed and the '
-          'information has been confirmed. If you would like to nominate someone, please use the '
-          'contribution page.',
+          'information has been confirmed. If you know somebody who belongs here, you can build '
+          'their profile below.',
       maxColumns: 4,
+      // Adding somebody goes to a profile builder rather than to the general
+      // contribution form. This section holds structured records, and an
+      // unstructured contribution to it gets taken apart by whoever reviews
+      // it — badly, and from memory.
+      footer: const _AddSomebody(),
       metaBuilder: (ContentRecord record) {
         final String? profession = record.text('profession');
         final String? city = record.text('city');
@@ -62,6 +69,44 @@ class PersonDetailPage extends StatelessWidget {
         const DetailField(label: 'Country', key: 'country'),
         const DetailField(label: 'Achievements', key: 'achievements'),
         const DetailField(label: 'Website', key: 'website_url'),
+      ],
+    );
+  }
+}
+
+/// THE WAY IN TO THE PROFILE BUILDER.
+///
+/// Placed under the list rather than as a button in the header, because
+/// somebody who has just read through the people already recorded is the
+/// person most likely to notice who is missing.
+class _AddSomebody extends StatelessWidget {
+  const _AddSomebody();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Gap.section(),
+        Text('Somebody missing?', style: theme.textTheme.headlineSmall),
+        const Gap.sm(),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppSpacing.maxReadingWidth),
+          child: Text(
+            'Tell us about them — an elder, a teacher, a professional, somebody who did something '
+            'worth remembering. You can add a photograph and a short film, and fill in as much as '
+            'you know. A partial record is worth far more than none.',
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+        const Gap.lg(),
+        FilledButton.icon(
+          onPressed: () => context.go(AppRoutes.contributePerson),
+          icon: const Icon(Icons.person_add_alt, size: 18),
+          label: const Text('Add somebody to the archive'),
+        ),
       ],
     );
   }

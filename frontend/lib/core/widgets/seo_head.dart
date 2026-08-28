@@ -17,6 +17,7 @@ class SeoMetadata {
     this.canonicalPath,
     this.type = 'website',
     this.publishedAt,
+    this.noIndex = false,
   });
 
   final String title;
@@ -32,6 +33,14 @@ class SeoMetadata {
   /// `website` or `article`.
   final String type;
   final String? publishedAt;
+
+  /// Keeps a page out of search results.
+  ///
+  /// For the screens that belong to one person rather than to the archive — an
+  /// age grade's own workspace, "the grades I administer". They are behind a
+  /// permission on the server either way; this is so they do not turn up in a
+  /// search result that then asks the reader to sign in.
+  final bool noIndex;
 
   String get fullTitle =>
       title == AppConfig.appName ? title : '$title — ${AppConfig.appName}';
@@ -61,6 +70,7 @@ class SeoMetadata {
       'twitter:description': ?description,
       'twitter:image': ?imageUrl,
       'article:published_time': ?publishedAt,
+      if (noIndex) 'robots': 'noindex, nofollow',
     };
   }
 }

@@ -23,16 +23,22 @@ class AuthService {
     return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
   }
 
-  /// Creates a contributor account.
+  /// Creates an account and signs into it.
   ///
   /// A new account gets the Contributor role and nothing more: it may submit
   /// material for review, and cannot publish anything.
-  Future<void> register({
+  ///
+  /// SIGNED IN IMMEDIATELY, rather than returned to a sign-in form. Somebody
+  /// who has just chosen a password and typed it correctly has proved exactly
+  /// what the sign-in form would ask them to prove thirty seconds later, from
+  /// memory. That step only loses people — and what they need next is their
+  /// dashboard, which is where the membership is actually completed.
+  Future<AppUser> register({
     required String email,
     required String password,
     required String displayName,
   }) async {
-    await _api.post(
+    final Map<String, dynamic> data = await _api.post(
       '/api/auth/register',
       authenticated: false,
       body: <String, dynamic>{
@@ -41,6 +47,26 @@ class AuthService {
         'display_name': displayName,
       },
     );
+
+    await _saveSession(data);
+    return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
+  }
+
+  /// Signs in using a reset token, for somebody who has just changed their
+  /// password — including after an administrator issued a temporary one.
+  Future<AppUser> completePasswordReset({
+    required String token,
+    required String password,
+  }) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/auth/reset-password',
+      authenticated: false,
+      body: <String, dynamic>{'token': token, 'password': password},
+    );
+
+    await _saveSession(data);
+    final Map<String, dynamic> me = await _api.get('/api/auth/me');
+    return AppUser.fromJson(me);
   }
 
   /// The signed-in user, or `null` when there is no valid session.

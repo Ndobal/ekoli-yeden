@@ -15,14 +15,24 @@ export interface Env {
   /**
    * R2 — material contributed by the community, awaiting review.
    *
-   * Deliberately a separate bucket rather than a folder in MEDIA. Unreviewed
+   * OPTIONAL, and unbound today. The intent is a separate bucket: unreviewed
    * material and the published archive have different audiences, different
-   * retention and different risk: a bucket boundary means a mistake in the
-   * media-serving path cannot expose something nobody has looked at yet, and
-   * the community can apply its own lifecycle rules to submissions without
-   * touching the archive.
+   * retention and different risk, and a bucket boundary is the strongest way
+   * to say so. But a binding to a bucket that does not exist fails the whole
+   * deploy, which took the contribution form offline entirely — a worse
+   * outcome than sharing a bucket.
+   *
+   * So when this is unbound, contributions land in MEDIA instead. What keeps
+   * them private is not the bucket, it is `MediaService.serve`: it resolves a
+   * storage key through the `media_assets` table and 404s when there is no
+   * row. A contributed file has no such row until it is approved, so it is
+   * unreachable at `/api/media/file/*` no matter who guesses the key.
+   *
+   * To restore the separation: create the bucket, add the binding back to
+   * wrangler.jsonc, redeploy. Nothing else changes — keys are identical
+   * either way, and existing records keep resolving.
    */
-  SUBMISSIONS: R2Bucket;
+  SUBMISSIONS?: R2Bucket;
 
   // --- Plain configuration (safe, non-secret) --------------------------
   ENVIRONMENT: string;

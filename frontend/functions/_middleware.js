@@ -57,10 +57,17 @@ const PAGES = {
       'Ekoli-Yeden, documented and verified by the Preservation Team.',
   },
   '/language': {
-    title: 'Learn Ekoli',
+    title: 'The Lokaa Dictionary',
     description:
-      'The Ekoli language: words, meanings, expressions and proverbs, with pronunciation recorded ' +
-      'by native speakers. Published sources identify Lokaa as the language of the Yakurr communities.',
+      'Words of Ekoli-Yeden with their meanings, variant forms, example sentences and ' +
+      'pronunciation, recorded by native speakers. Published sources identify Lokaa as the ' +
+      'language of the Yakurr communities.',
+  },
+  '/language/contribute': {
+    title: 'Contribute a word',
+    description:
+      'Add a word to the Ekoli-Yeden dictionary: what it means, how it is said, and a sentence ' +
+      'using it. A language editor checks every entry before it is published.',
   },
   '/festivals': {
     title: 'Festivals',
@@ -108,6 +115,18 @@ const PAGES = {
     title: 'Events',
     description: 'Community meetings, ceremonies, cultural activities and gatherings in Ekoli-Yeden.',
   },
+  '/gallery/photographs': {
+    title: 'Every photograph',
+    description:
+      'Every photograph in the Ekoli Yeden archive, from every album and every festival year, ' +
+      'newest first.',
+  },
+  '/age-grades/register': {
+    title: 'Register your age grade',
+    description:
+      'Register an age grade of Ekoli-Yeden and keep its page yourself — its members, its ' +
+      'photographs and its news.',
+  },
   '/gallery': {
     title: 'Photo Gallery',
     description:
@@ -140,6 +159,48 @@ const PAGES = {
     description:
       'Share old photographs, documents, stories, oral history and language recordings with the ' +
       'archive. Every contribution is reviewed before publication, and every contributor is credited.',
+  },
+  '/ancestry': {
+    title: 'Ancestry Records',
+    description:
+      'The people Ekoli-Yeden came from. Nobody is removed from this archive when they die — ' +
+      'their account is stilled, what they made public stays public, and they are remembered here.',
+  },
+  '/places': {
+    title: 'The Places of Ekori',
+    description:
+      'Ajere, Ntan, Epenti and Afrekpe, the quarters inside them and the compounds inside ' +
+      'those — how Ekori fits together, and who is from each part of it.',
+  },
+  '/community/forums': {
+    title: 'Community Forums',
+    description:
+      'Where the community talks to itself: questions, answers and announcements, kept where ' +
+      'the next person can find them instead of scrolling away in a group chat.',
+  },
+  '/news/submit': {
+    title: 'Send in news',
+    description:
+      'Tell the community what has happened. Anybody may write it; an administrator reads ' +
+      'everything that arrives and decides what is published.',
+  },
+  '/terms': {
+    title: 'Terms of Use',
+    description:
+      'What this archive is, what you can expect of it, and what it asks of you. Plain terms ' +
+      'for a community heritage archive — no advertising, nothing for sale.',
+  },
+  '/privacy': {
+    title: 'Privacy Policy',
+    description:
+      'What this archive collects, what it does with it, and what you can ask for. No ' +
+      'advertising, no trackers, and nothing about you is ever sold.',
+  },
+  '/cookies': {
+    title: 'Cookies',
+    description:
+      'What this site stores on your device: a sign-in session, and nothing else. No ' +
+      'advertising or analytics cookies, which is why there is no banner.',
   },
   '/preservation-team': {
     title: 'The Ekoli-Yeden Preservation Team',
@@ -179,10 +240,36 @@ const DETAIL_ROUTES = {
   'cultural-groups': { resource: 'cultural-groups', section: 'Cultural Groups' },
   music: { resource: 'music', section: 'Cultural Music' },
   language: { resource: 'language', section: 'Language' },
+  ancestry: { resource: 'ancestry', section: 'Ancestry Records' },
+  places: { resource: 'places', section: 'The Places of Ekori' },
 };
 
-/** Paths that must never be indexed. */
-const PRIVATE_PREFIXES = ['/admin', '/editorial', '/sign-in', '/register'];
+/**
+ * Paths that must never be indexed.
+ *
+ * `/my/` covers the workspace screens that belong to one person rather than to
+ * the archive — the age grades somebody administers. They are behind a
+ * permission on the server either way; this is so they never turn up in a
+ * search result that then asks the reader to sign in.
+ */
+const PRIVATE_PREFIXES = [
+  '/admin',
+  '/editorial',
+  '/sign-in',
+  '/register',
+  '/my/',
+  '/account',
+  // The member directory is the community's list of itself, not a public
+  // register. The API refuses it without a session; this keeps a crawler from
+  // holding on to a page of real people's names and professions regardless.
+  '/directory',
+  // Signed-in and matched to the reader. There is nothing to index and nothing
+  // useful to show somebody the archive knows nothing about.
+  '/opportunities',
+  // Private conversations between two people. Never indexed, never previewed,
+  // and never fetched for metadata.
+  '/messages',
+];
 
 export async function onRequest(context) {
   const { request, next } = context;
@@ -214,7 +301,7 @@ export async function onRequest(context) {
     .transform(response);
 
   const headers = new Headers(rewritten.headers);
-  if (PRIVATE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+  if (meta.noIndex || PRIVATE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     headers.set('x-robots-tag', 'noindex, nofollow');
   }
   // A short edge cache keeps the API lookup off the critical path for repeat
@@ -245,16 +332,91 @@ async function resolveMetadata(url) {
 
   const segments = path.split('/').filter(Boolean);
 
+  // An age grade's own workspace belongs to its administrators, not to the
+  // archive. Matched here rather than by prefix because the grade's public page
+  // sits one segment above it and must stay indexable.
+  if (segments[0] === 'age-grades' && segments[2] === 'manage') {
+    return {
+      title: SITE_NAME,
+      description: TAGLINE,
+      canonical,
+      image: DEFAULT_IMAGE,
+      type: 'website',
+      body: `<h1>${escapeHtml(SITE_NAME)}</h1>`,
+      noIndex: true,
+    };
+  }
+
+  // A conversation, or the moderators' queue.
+  //
+  // The forum index and each space are indexable; a topic is not. Two of the
+  // three spaces may contain minors, the server refuses their contents to an
+  // anonymous caller, and a crawler must not be handed a title from the one
+  // space that is public either — a question somebody asked in 2026 should not
+  // be the first search result for their name in 2036.
+  if (segments[0] === 'community' && segments[1] === 'forums' && segments.length >= 3) {
+    return {
+      title: `Community Forums | ${SITE_NAME}`,
+      description: PAGES['/community/forums'].description,
+      canonical,
+      image: DEFAULT_IMAGE,
+      type: 'website',
+      body: `<h1>Community Forums</h1><p>${escapeHtml(PAGES['/community/forums'].description)}</p>`,
+      noIndex: true,
+    };
+  }
+
+  // One area of the cultural archive — /culture/area/food. A shelf rather than
+  // an article, so it takes its description from the section list rather than
+  // from a record lookup that would find nothing.
+  if (segments.length === 3 && segments[0] === 'culture' && segments[1] === 'area') {
+    const label = titleCase(segments[2].replace(/-/g, ' '));
+    const description =
+      `What the Ekoli Yeden archive holds on ${label.toLowerCase()}, and how to add to it. ` +
+      'Each area is filled by the Preservation Team as material is collected and verified.';
+
+    return {
+      title: `${label} — Culture & Heritage | ${SITE_NAME}`,
+      description,
+      canonical,
+      image: DEFAULT_IMAGE,
+      type: 'website',
+      body: `<h1>${escapeHtml(label)}</h1><p>${escapeHtml(description)}</p>`,
+    };
+  }
+
+  // A post by an age grade — /age-grades/<grade>/posts/<post>.
+  if (segments.length === 4 && segments[0] === 'age-grades' && segments[2] === 'posts') {
+    const post = await fetchJson(`${API}/api/age-grades/${segments[1]}/posts/${segments[3]}`);
+    if (post) {
+      const description =
+        truncate(post.excerpt || post.body || '', 280) ||
+        `Posted by ${post.author_name || 'an age grade'} of Ekoli-Yeden.`;
+
+      return {
+        title: `${post.title} — ${post.author_name || 'Age Grades'} | ${SITE_NAME}`,
+        description,
+        canonical,
+        image: DEFAULT_IMAGE,
+        type: 'article',
+        body:
+          `<h1>${escapeHtml(post.title)}</h1>` +
+          `<p>${escapeHtml(description)}</p>` +
+          (post.body ? `<div>${escapeHtml(truncate(post.body, 4000))}</div>` : ''),
+      };
+    }
+  }
+
   // A detail page: fetch the record so the preview is about the record.
   if (segments.length === 2 && DETAIL_ROUTES[segments[0]]) {
     const record = await fetchRecord(DETAIL_ROUTES[segments[0]].resource, segments[1]);
     if (record) {
       const section = DETAIL_ROUTES[segments[0]].section;
-      const title = record.title || record.name || record.word || section;
+      const title = record.title || record.name || record.full_name || record.word || section;
       const description =
         truncate(
           record.summary || record.excerpt || record.description || record.english_meaning ||
-            record.headline || record.body || '',
+            record.headline || record.biography || record.body || '',
           280,
         ) || `${title} — part of the ${SITE_NAME}.`;
 
@@ -325,6 +487,26 @@ async function fetchRecord(resource, identifier) {
     // A metadata lookup must never break the page. The defaults still apply.
     return null;
   }
+}
+
+/** A GET returning the API's `data` envelope, or null on any failure. */
+async function fetchJson(url) {
+  try {
+    const response = await fetch(url, { cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload.success ? payload.data : null;
+  } catch {
+    // A metadata lookup must never break the page. The defaults still apply.
+    return null;
+  }
+}
+
+/** "oral history" -> "Oral history". Sentence case, not title case: the areas
+ *  are named the way the culture page names them. */
+function titleCase(value) {
+  const clean = String(value || '').trim();
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
 async function fetchFestival(slug) {

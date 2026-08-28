@@ -168,11 +168,13 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     writableColumns: [
       'slug', 'title', 'description', 'category', 'start_datetime', 'end_datetime',
       'location', 'venue', 'organiser', 'contact_info', 'festival_id',
-      'is_featured', 'cover_media_id', 'seo_title', 'seo_description', 'status',
+      'event_type', 'group_id',
+      'is_featured', 'cover_media_id', 'banner_media_id', 'flier_media_id',
+      'seo_title', 'seo_description', 'status',
     ],
     publicColumns: null,
     searchableColumns: ['title', 'description', 'location', 'venue'],
-    sortableColumns: ['title', 'start_datetime', ...AUDIT_COLUMNS],
+    sortableColumns: ['title', 'start_datetime', 'event_type', ...AUDIT_COLUMNS],
     defaultSort: 'start_datetime',
     defaultOrder: 'DESC',
     managedBy: CONTENT_ADMIN,
@@ -227,10 +229,23 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
       'word', 'english_meaning', 'category_id', 'definition', 'example_sentence',
       'example_translation', 'part_of_speech', 'dialect_or_variation', 'notes',
       'speaker', 'entry_type', 'verification_status', 'status',
+      // A word is often several parts of speech at once, so the headword
+      // carries a list as well as the older single column. The senses,
+      // variants and example sentences are rows of their own and are written
+      // through `/api/admin/language/:id/entry`, not from here.
+      'parts_of_speech', 'phonetic_respelling', 'ipa', 'tone_pattern',
+      'plural_form', 'singular_form', 'literal_translation', 'usage_notes',
+      'register', 'etymology', 'see_also',
     ],
     publicColumns: null,
-    searchableColumns: ['word', 'english_meaning', 'definition', 'example_sentence'],
-    sortableColumns: ['word', 'english_meaning', ...AUDIT_COLUMNS],
+    // `word_normalised` is searched so that somebody typing without tone marks
+    // still finds the word. It is derived on write and never accepted from a
+    // request, which is why it is searchable but not writable.
+    searchableColumns: [
+      'word', 'word_normalised', 'english_meaning', 'definition',
+      'example_sentence', 'literal_translation',
+    ],
+    sortableColumns: ['word', 'word_normalised', 'english_meaning', ...AUDIT_COLUMNS],
     defaultSort: 'word',
     defaultOrder: 'ASC',
     managedBy: LANGUAGE,
@@ -245,7 +260,7 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     slugColumn: 'slug',
     writableColumns: [
       'slug', 'title', 'description', 'category', 'event_date', 'location',
-      'festival_id', 'cover_media_id', 'sort_order',
+      'festival_id', 'event_id', 'cover_media_id', 'sort_order',
       'seo_title', 'seo_description', 'status',
     ],
     publicColumns: null,
@@ -343,27 +358,33 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     fixedFilters: { content_type: 'culture' },
   },
 
-  // Age grades, cultural groups and cultural music. Like `culture`, these share
-  // the `content_items` table and are discriminated by `content_type` — three
-  // more shelves in the same cupboard rather than three new tables.
+  // Age grades have a table of their own, unlike cultural groups and music
+  // below. An age grade is not an article: it is a standing body with living
+  // members, its own administrators and its own news, and rows that own other
+  // rows do not belong in a shared-discriminator table.
+  //
+  // The people who know what a grade has been doing this year are its own
+  // members, so the grade runs its page itself — see `age-grade.service.ts`.
+  // This registry entry is the Heritage Editor's view of the same record.
   'age-grades': {
     key: 'age-grades',
-    table: 'content_items',
+    table: 'age_grades',
     label: 'Age grade',
     slugColumn: 'slug',
     writableColumns: [
-      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'cover_media_id',
-      'seo_title', 'seo_description', 'sort_order', 'verification_status', 'status',
+      'slug', 'title', 'subtitle', 'excerpt', 'body', 'category', 'motto',
+      'formed_year', 'birth_years', 'contact_name', 'contact_phone', 'contact_email',
+      'cover_media_id', 'gallery_id', 'seo_title', 'seo_description', 'seo_image_media_id',
+      'sort_order', 'verification_status', 'status',
     ],
     publicColumns: null,
-    searchableColumns: ['title', 'subtitle', 'excerpt', 'body'],
-    sortableColumns: ['title', 'sort_order', ...AUDIT_COLUMNS],
+    searchableColumns: ['title', 'subtitle', 'excerpt', 'body', 'motto'],
+    sortableColumns: ['title', 'formed_year', 'sort_order', ...AUDIT_COLUMNS],
     defaultSort: 'sort_order',
     defaultOrder: 'ASC',
     managedBy: HERITAGE,
     hasVerification: true,
     searchable: true,
-    fixedFilters: { content_type: 'age_grades' },
   },
 
   'cultural-groups': {

@@ -153,6 +153,97 @@ class LanguageEntryTypes {
   static String label(String slug) => labels[slug] ?? slug;
 }
 
+/// Parts of speech, for labelling a dictionary entry.
+///
+/// The authoritative list is the `language_parts_of_speech` table, served with
+/// the dictionary index — Lokaa grammar is not English grammar, and the
+/// community's language scholars can add a category without a deployment.
+/// These labels are the fallback used before that arrives, and the
+/// abbreviations a dictionary prints against each sense.
+class PartsOfSpeech {
+  const PartsOfSpeech._();
+
+  static const Map<String, String> labels = <String, String>{
+    'noun': 'Noun',
+    'verb': 'Verb',
+    'adjective': 'Adjective',
+    'adverb': 'Adverb',
+    'pronoun': 'Pronoun',
+    'preposition': 'Preposition',
+    'conjunction': 'Conjunction',
+    'interjection': 'Interjection',
+    'numeral': 'Numeral',
+    'determiner': 'Determiner',
+    'particle': 'Particle',
+    'ideophone': 'Ideophone',
+    'phrase': 'Phrase',
+  };
+
+  static const Map<String, String> abbreviations = <String, String>{
+    'noun': 'n.',
+    'verb': 'v.',
+    'adjective': 'adj.',
+    'adverb': 'adv.',
+    'pronoun': 'pron.',
+    'preposition': 'prep.',
+    'conjunction': 'conj.',
+    'interjection': 'interj.',
+    'numeral': 'num.',
+    'determiner': 'det.',
+    'particle': 'part.',
+    'ideophone': 'ideo.',
+    'phrase': 'phr.',
+  };
+
+  static List<String> get all => labels.keys.toList();
+
+  static String label(String slug) => labels[slug] ?? slug;
+
+  static String abbreviation(String slug) => abbreviations[slug] ?? label(slug);
+}
+
+/// The kinds of variant form a word can have.
+///
+/// Recording a variant as its own thing is what makes it findable by somebody
+/// who only knows the form their own family says.
+class VariantTypes {
+  const VariantTypes._();
+
+  static const Map<String, String> labels = <String, String>{
+    'alternate': 'Another form',
+    'spelling': 'Spelling',
+    'dialect': 'Said differently here',
+    'plural': 'Plural',
+    'singular': 'Singular',
+    'archaic': 'Older form',
+    'diminutive': 'Small or affectionate form',
+    'honorific': 'Respectful form',
+  };
+
+  static List<String> get all => labels.keys.toList();
+
+  static String label(String slug) => labels[slug] ?? slug;
+}
+
+/// The kinds of post an age grade publishes under its own name.
+class AgeGradePostTypes {
+  const AgeGradePostTypes._();
+
+  static const Map<String, String> labels = <String, String>{
+    'update': 'Update',
+    'announcement': 'Announcement',
+    'meeting': 'Meeting',
+    'project': 'Project',
+    'obituary': 'Obituary',
+    'report': 'Report',
+    'history': 'History',
+  };
+
+  static List<String> get all => labels.keys.toList();
+
+  static String label(String slug) => labels[slug] ?? slug;
+}
+
 /// What a visitor may contribute to the archive.
 class SubmissionTypes {
   const SubmissionTypes._();

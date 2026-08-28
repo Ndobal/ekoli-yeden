@@ -48,6 +48,7 @@ class Gap extends StatelessWidget {
   const Gap.xxxl({super.key}) : _size = AppSpacing.xxxl, _horizontal = false;
   const Gap.section({super.key}) : _size = AppSpacing.section, _horizontal = false;
 
+  const Gap.hXs({super.key}) : _size = AppSpacing.xs, _horizontal = true;
   const Gap.hSm({super.key}) : _size = AppSpacing.sm, _horizontal = true;
   const Gap.hMd({super.key}) : _size = AppSpacing.md, _horizontal = true;
   const Gap.hLg({super.key}) : _size = AppSpacing.lg, _horizontal = true;

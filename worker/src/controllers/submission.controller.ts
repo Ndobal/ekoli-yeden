@@ -24,7 +24,7 @@ export async function contributionTypes(_context: RequestContext): Promise<Respo
       { slug: 'story', label: 'Story' },
       { slug: 'oral_history', label: 'Oral history / interview' },
       { slug: 'language_recording', label: 'Ekoli language recording' },
-      { slug: 'video', label: 'Video (YouTube link)' },
+      { slug: 'video', label: 'Video (upload a short clip, or send a YouTube link)' },
       { slug: 'notable_person', label: 'Information about a notable person' },
       { slug: 'cultural_material', label: 'Cultural material' },
       { slug: 'correction', label: 'A correction to something already published' },

@@ -205,6 +205,12 @@ function validateCommonFields(resource: ContentResource, body: Record<string, un
   if ('youtube_video_id' in body) {
     validator.youtubeVideoId('youtube_video_id', { required: resource.key === 'videos' });
   }
+  // A dictionary word is often several parts of speech at once — a noun and a
+  // verb — so the column holds a JSON array. Accepted from the client as a real
+  // array and stored as text; a client that already sends text is left alone.
+  if (Array.isArray(body['parts_of_speech'])) {
+    validator.stringArray('parts_of_speech', { maxItems: 8 });
+  }
 
   const normalised = validator.validated();
   // Fold normalised values (lowercased email, extracted video id, parsed

@@ -1,12 +1,13 @@
 import type { RequestContext } from '../types/api';
 import { requireResource } from '../services/content-registry';
 import { ContentService, PUBLIC_STATUSES } from '../services/content.service';
+import { adminCreate, adminChangeStatus } from './content.controller';
 import { decorateVideos } from '../services/video.service';
-import { GalleryRepository } from '../repositories/gallery.repository';
+import { GalleryService } from '../services/gallery.service';
 import { listRecords, findRecordBy } from '../repositories/base.repository';
 import { CONTENT_STATUS } from '../types/models';
 import { NotFoundError } from '../utils/errors';
-import { json, publicCacheHeaders } from '../utils/responses';
+import { json, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
 import { publicMediaUrl } from '../utils/files';
 
 /**
@@ -64,7 +65,7 @@ export async function showFestival(context: RequestContext): Promise<Response> {
   const festival = await resolveFestival(context, identifier);
 
   const festivalId = String(festival['id']);
-  const [events, videos, galleryItems] = await Promise.all([
+  const [events, videos, gallery] = await Promise.all([
     loadEvents(context.env.DB, festivalId),
     loadVideos(context.env.DB, festivalId),
     loadGallery(context, festival),
@@ -79,7 +80,13 @@ export async function showFestival(context: RequestContext): Promise<Response> {
       // flat list of activities loses the shape of it.
       programme: groupProgramme(events),
       videos,
-      gallery: galleryItems,
+      gallery: gallery.items,
+      // The album itself, so the page can link to it and invite photographs
+      // into the right year. Every edition has one, which is what gives a
+      // photograph a year to belong to — and because it is an ordinary
+      // gallery, the same pictures also reach the main Gallery section.
+      gallery_id: gallery.id,
+      gallery_slug: gallery.slug,
     },
     { headers: publicCacheHeaders() },
   );
@@ -229,27 +236,199 @@ async function loadVideos(db: D1Database, festivalId: string): Promise<Record<st
   return decorateVideos(items);
 }
 
+/**
+ * A festival's photographs.
+ *
+ * Resolved through `festivals.gallery_id` where it is set, and otherwise by
+ * looking for a gallery that names this festival. The fallback matters: an
+ * edition created before galleries were attached to festivals, or through a
+ * path that forgot, still finds its album instead of showing nothing.
+ */
 async function loadGallery(
   context: RequestContext,
   festival: Record<string, unknown>,
-): Promise<Record<string, unknown>[]> {
+): Promise<{ id: string | null; slug: string | null; items: Record<string, unknown>[] }> {
+  const service = new GalleryService(context.env);
+  const festivalId = String(festival['id'] ?? '');
   const galleryId = festival['gallery_id'];
-  if (typeof galleryId !== 'string' || galleryId === '') return [];
 
-  const repository = new GalleryRepository(context.env.DB);
-  const items = await repository.itemsForGallery(galleryId, [CONTENT_STATUS.PUBLISHED]);
+  let gallery =
+    typeof galleryId === 'string' && galleryId !== ''
+      ? await service.repo.findById(galleryId)
+      : null;
 
-  return items.map((item) => ({
-    id: item.id,
-    caption: item.caption,
-    photographer: item.photographer,
-    people_pictured: item.people_pictured,
-    taken_at: item.taken_at,
-    location: item.location,
-    alt_text: item.alt_text,
-    mime_type: item.mime_type,
-    url: publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, item.storage_key),
-  }));
+  gallery ??= festivalId === '' ? null : await service.repo.findPrimaryForFestival(festivalId);
+
+  if (!gallery || gallery.status !== CONTENT_STATUS.PUBLISHED) {
+    return { id: gallery?.id ?? null, slug: gallery?.slug ?? null, items: [] };
+  }
+
+  const items = await service.repo.itemsForGallery(gallery.id, [CONTENT_STATUS.PUBLISHED]);
+  return {
+    id: gallery.id,
+    slug: gallery.slug,
+    items: items.map((item) => service.decorateItem(item)),
+  };
+}
+
+/**
+ * `POST /api/admin/festivals/:id/gallery`
+ *
+ * The festival's album, created if it is missing.
+ *
+ * Idempotent on purpose. The workspace calls it whenever somebody opens a
+ * festival's photographs, so an edition that predates this — or one added
+ * through a path that did not make an album — is repaired by being looked at,
+ * rather than waiting for somebody to notice.
+ */
+export async function ensureFestivalGallery(context: RequestContext): Promise<Response> {
+  const festival = await findRecordBy<Record<string, unknown>>(
+    context.env.DB,
+    'festivals',
+    'id',
+    context.params['id'] ?? '',
+  );
+  if (!festival) throw new NotFoundError('That festival was not found.');
+
+  const service = new GalleryService(context.env);
+  const gallery = await ensureAlbumFor(service, festival);
+
+  const items = await service.repo.itemsForGallery(gallery.id, ALL_EDITABLE_STATUSES);
+
+  return json(
+    {
+      gallery,
+      items: items.map((item) => service.decorateItem(item)),
+      counts: await service.repo.countsForGallery(gallery.id),
+    },
+    { headers: NO_STORE_HEADERS },
+  );
+}
+
+/**
+ * `GET /api/admin/festival-galleries`
+ *
+ * Every festival with its album and a photograph count — the index the
+ * workspace opens on, so a Media Team volunteer picks a year rather than
+ * hunting for an album by name.
+ */
+export async function festivalGalleryIndex(context: RequestContext): Promise<Response> {
+  const service = new GalleryService(context.env);
+  const { items: festivals } = await listRecords<Record<string, unknown>>(context.env.DB, 'festivals', {
+    sortColumn: 'year',
+    sortDirection: 'DESC',
+    limit: 100,
+    offset: 0,
+  });
+
+  // Sequential rather than parallel: each iteration may create a gallery, and
+  // two concurrent creations for the same festival would race on the slug.
+  const rows: Record<string, unknown>[] = [];
+  for (const festival of festivals) {
+    const gallery = await ensureAlbumFor(service, festival);
+    const counts = await service.repo.countsForGallery(gallery.id);
+
+    rows.push({
+      festival_id: festival['id'],
+      festival_name: festival['name'],
+      festival_slug: festival['slug'],
+      year: festival['year'],
+      festival_status: festival['status'],
+      gallery_id: gallery.id,
+      gallery_slug: gallery.slug,
+      gallery_title: gallery.title,
+      gallery_status: gallery.status,
+      counts,
+      total: Object.values(counts).reduce((sum, value) => sum + value, 0),
+    });
+  }
+
+  return json({ items: rows, total: rows.length }, { headers: NO_STORE_HEADERS });
+}
+
+/**
+ * `POST /api/admin/festivals` — create an edition, and its album with it.
+ *
+ * Wraps the generated create handler rather than replacing it, so festivals
+ * keep exactly the validation, versioning and audit behaviour every other
+ * content type has. The only addition is the album, created in the same
+ * request: a festival that exists without one is a festival whose photographs
+ * have nowhere to go, and relying on somebody to remember afterwards is how
+ * that ends up being nobody.
+ */
+export async function createFestival(context: RequestContext): Promise<Response> {
+  const response = await adminCreate(FESTIVAL_RESOURCE)(context);
+  if (response.status !== 201) return response;
+
+  // The body is read back rather than threaded through, so the generated
+  // handler stays the single definition of what creating a record means.
+  const cloned = response.clone();
+  const payload = (await cloned.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
+  const festival = payload?.data;
+  if (!festival || typeof festival['id'] !== 'string') return response;
+
+  const service = new GalleryService(context.env);
+  const gallery = await ensureAlbumFor(service, festival);
+
+  return json(
+    { ...festival, gallery_id: gallery.id, gallery_slug: gallery.slug },
+    { status: 201, headers: NO_STORE_HEADERS },
+  );
+}
+
+/**
+ * `PATCH /api/admin/festivals/:id/status`
+ *
+ * Moves an edition through the workflow and takes its album with it.
+ * Publishing a festival whose photographs stay in draft produces a page that
+ * says "Photographs" above nothing at all.
+ */
+export async function changeFestivalStatus(context: RequestContext): Promise<Response> {
+  const response = await adminChangeStatus(FESTIVAL_RESOURCE)(context);
+  if (!response.ok) return response;
+
+  const cloned = response.clone();
+  const payload = (await cloned.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
+  const festival = payload?.data;
+  if (!festival || typeof festival['id'] !== 'string') return response;
+
+  await new GalleryService(context.env).syncFestivalGalleryStatus(
+    festival['id'],
+    String(festival['status'] ?? CONTENT_STATUS.DRAFT),
+  );
+
+  return response;
+}
+
+/** Statuses the workspace may see. Everything except a deleted row. */
+const ALL_EDITABLE_STATUSES = [
+  CONTENT_STATUS.DRAFT,
+  CONTENT_STATUS.PENDING_REVIEW,
+  CONTENT_STATUS.APPROVED,
+  CONTENT_STATUS.PUBLISHED,
+  CONTENT_STATUS.ARCHIVED,
+];
+
+/** Finds or creates a festival's album and keeps its visibility in step. */
+async function ensureAlbumFor(service: GalleryService, festival: Record<string, unknown>) {
+  const gallery = await service.ensureFestivalGallery({
+    id: String(festival['id']),
+    slug: String(festival['slug'] ?? festival['id']),
+    name: String(festival['name'] ?? 'Festival'),
+    year: Number(festival['year'] ?? 0),
+    start_date: (festival['start_date'] as string | null) ?? null,
+    location: (festival['location'] as string | null) ?? null,
+    status: (festival['status'] as string | null) ?? CONTENT_STATUS.DRAFT,
+  });
+
+  // Publishing an edition should publish its photographs; archiving one should
+  // not leave them advertised on a page nobody links to any more.
+  await service.syncFestivalGalleryStatus(
+    String(festival['id']),
+    String(festival['status'] ?? gallery.status),
+  );
+
+  return (await service.repo.findById(gallery.id)) ?? gallery;
 }
 
 /** Programme, sponsors, announcements and committee are stored as JSON text. */

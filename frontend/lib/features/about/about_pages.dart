@@ -14,6 +14,7 @@ import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../repositories/settings_repository.dart';
+import 'contact_form.dart';
 
 /// A page banner: title, introduction, and the brand mark.
 ///
@@ -377,10 +378,27 @@ class ContactPage extends StatelessWidget {
                     ),
                   ),
                 const Gap.xxl(),
-                FilledButton.icon(
-                  onPressed: () => context.go(AppRoutes.contribute),
-                  icon: const Icon(Icons.upload_file_outlined, size: 18),
-                  label: const Text('Contribute to the archive'),
+
+                // The form comes before the "contribute" button on purpose.
+                // Most people arriving here want to say something, not upload
+                // a file, and until now the page offered them only an address.
+                const ContactForm(),
+
+                const Gap.xxl(),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: <Widget>[
+                    OutlinedButton.icon(
+                      onPressed: () => context.go(AppRoutes.contribute),
+                      icon: const Icon(Icons.upload_file_outlined, size: 18),
+                      label: const Text('Contribute to the archive'),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go(AppRoutes.privacy),
+                      child: const Text('How we handle what you send'),
+                    ),
+                  ],
                 ),
               ],
             ),

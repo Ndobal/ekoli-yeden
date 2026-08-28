@@ -4,62 +4,20 @@ import '../../core/routing/app_routes.dart';
 import '../shared/content_detail_page.dart';
 import '../shared/content_list_page.dart';
 
-/// AGE GRADES, CULTURAL GROUPS AND CULTURAL MUSIC.
+/// CULTURAL GROUPS AND CULTURAL MUSIC.
 ///
-/// Three parts of community life that the community named directly. Each is a
+/// Two parts of community life that the community named directly. Each is a
 /// registered content type of its own rather than a paragraph inside the
-/// culture page, because each will eventually hold many records — every age
-/// grade, every group, every musical form — and each deserves its own address.
+/// culture page, because each will eventually hold many records — every group,
+/// every musical form — and each deserves its own address.
+///
+/// Age grades were a third, and have moved to `features/age_grades/`. They
+/// outgrew this file: unlike a group or a musical form, an age grade has living
+/// members and its own administrators, and it keeps its own page rather than
+/// waiting for an editor to write one.
 ///
 /// The names seeded so far came from a member of the community. Everything
 /// beyond the names is left to be documented, and each record says so.
-
-class AgeGradesListPage extends StatelessWidget {
-  const AgeGradesListPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const ContentListPage(
-      resource: 'age-grades',
-      basePath: AppRoutes.ageGrades,
-      eyebrow: 'Community structure',
-      title: 'Age Grades',
-      descriptionKey: 'page.age_grades.intro',
-      description:
-          'Age grades are one of the ways Ekoli-Yeden organises itself — groupings of people of a '
-          'similar age who take on responsibilities together.',
-      emptyTitle: 'No age grades recorded yet',
-      emptyMessage:
-          'Each age grade should have its own record here: its name, when it was formed, who '
-          'belongs to it, and what it has done for the community. If you belong to a grade, or '
-          'can name the grades and the years they were formed, please contribute.',
-      showVerification: true,
-      maxColumns: 3,
-    );
-  }
-}
-
-class AgeGradeDetailPage extends StatelessWidget {
-  const AgeGradeDetailPage({required this.slug, super.key});
-
-  final String slug;
-
-  @override
-  Widget build(BuildContext context) {
-    return ContentDetailPage(
-      resource: 'age-grades',
-      identifier: slug,
-      basePath: AppRoutes.ageGrades,
-      sectionTitle: 'Age Grades',
-      showVerification: true,
-      showSources: true,
-      showContributors: true,
-      detailFields: const <DetailField>[
-        DetailField(label: 'Also known as', key: 'subtitle'),
-      ],
-    );
-  }
-}
 
 /// CULTURAL GROUPS — Obam, Igban and the others.
 class CulturalGroupsListPage extends StatelessWidget {

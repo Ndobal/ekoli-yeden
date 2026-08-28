@@ -8,6 +8,7 @@ import '../../core/config/app_config.dart';
 import '../../core/errors/app_exception.dart';
 import '../storage/token_storage.dart';
 import 'api_response.dart';
+import 'mime_types.dart';
 
 /// HTTP status codes used below.
 ///
@@ -154,7 +155,25 @@ class ApiClient {
     final http.MultipartRequest request = http.MultipartRequest('POST', _uri(path))
       ..fields['folder'] = folder
       ..fields.addAll(fields)
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+          // WITHOUT THIS, EVERY UPLOAD IS REJECTED.
+          //
+          // `MultipartFile.fromBytes` defaults its content type to
+          // `application/octet-stream`, which the API's allow-list refuses in
+          // every folder — so a perfectly ordinary photograph arrives claiming
+          // to be an unknown binary and is turned away.
+          //
+          // The type is derived from the filename because that is the only
+          // thing available here: the file picker on web does not reliably
+          // report a MIME type. The server re-derives it and checks the bytes
+          // themselves, so nothing trusts this value.
+          contentType: mimeTypeFor(filename),
+        ),
+      );
 
     request.headers.addAll(await _headers(authenticated: authenticated, json: false));
 

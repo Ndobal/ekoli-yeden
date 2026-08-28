@@ -1,4 +1,5 @@
 import type { RequestContext } from '../types/api';
+import { ContributionUploadService } from '../services/contribution-upload.service';
 import { NO_STORE_HEADERS, json, raw } from '../utils/responses';
 
 /**
@@ -45,6 +46,12 @@ export async function readiness(context: RequestContext): Promise<Response> {
     console.error(`[${context.requestId}] R2 readiness check failed`, error);
     checks['r2'] = { ok: false, detail: 'unavailable' };
   }
+
+  // Where contributed files land. Reported rather than checked: both answers
+  // are working configurations, and the community needs to be able to see
+  // which one is live without reading wrangler.jsonc.
+  const storage = new ContributionUploadService(context.env).storageMode;
+  checks['contributions'] = { ok: true, detail: storage.detail };
 
   checks['jwt_secret'] = {
     ok: Boolean(context.env.JWT_SECRET && context.env.JWT_SECRET.length >= 32),

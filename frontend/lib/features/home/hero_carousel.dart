@@ -11,7 +11,10 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/brand_logo.dart';
+import '../../models/gallery.dart';
 import '../../repositories/cms_repository.dart';
+import '../../repositories/gallery_repository.dart';
+import '../../services/api/api_response.dart';
 
 /// The homepage hero: five slides, all editable through the CMS.
 ///
@@ -44,6 +47,47 @@ class _HeroCarouselState extends State<HeroCarousel> {
   bool _userTookControl = false;
 
   static const Duration _interval = Duration(seconds: 7);
+
+  /// Photographs drawn from the archive to stand behind slides that have no
+  /// image of their own.
+  ///
+  /// ---------------------------------------------------------------------
+  /// WHY THE ARCHIVE'S OWN PICTURES, CHOSEN AT RANDOM
+  /// ---------------------------------------------------------------------
+  ///
+  /// The hero slots were meant to be filled by the Media Team one at a time,
+  /// and until they are the homepage shows five coloured panels. Meanwhile the
+  /// archive fills up with photographs nobody sees on the front page.
+  ///
+  /// So the front page borrows from what is already published. It changes as
+  /// the community contributes, which is the honest impression to give — this
+  /// is a living archive, and the homepage should look like one.
+  ///
+  /// SHUFFLED ONCE PER VISIT, not per rebuild. A carousel whose backgrounds
+  /// changed every time Flutter repainted would be unusable.
+  List<Photograph> _pool = const <Photograph>[];
+  bool _poolRequested = false;
+
+  Future<void> _loadPool() async {
+    if (_poolRequested) return;
+    _poolRequested = true;
+
+    try {
+      final PaginatedResult<Photograph> result =
+          await context.read<GalleryRepository>().photographs(perPage: 24);
+
+      // Stills only. A video frame cannot be used as a background image, and
+      // asking a browser to decode one behind text on a phone is worse still.
+      final List<Photograph> stills =
+          result.items.where((Photograph p) => !p.isVideo).toList();
+      stills.shuffle();
+
+      if (mounted) setState(() => _pool = stills);
+    } catch (_) {
+      // A hero that cannot reach the archive falls back to the branded panels,
+      // which is exactly what it did before. Never an error on the front page.
+    }
+  }
 
   @override
   void dispose() {
@@ -84,6 +128,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
     final CmsController cms = context.watch<CmsController>();
     final List<HeroSlide> slides = cms.heroSlides.isEmpty ? _fallbackSlides : cms.heroSlides;
 
+    // Deferred: `context.read` is not safe during build itself.
+    if (!_poolRequested) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadPool());
+    }
+
     // The platform's own accessibility setting wins over our animation.
     final bool reduceMotion = MediaQuery.disableAnimationsOf(context);
     if (!reduceMotion && _timer == null && !_userTookControl) {
@@ -115,8 +164,15 @@ class _HeroCarouselState extends State<HeroCarousel> {
                   controller: _controller,
                   itemCount: slides.length,
                   onPageChanged: (int index) => setState(() => _index = index),
-                  itemBuilder: (BuildContext context, int index) =>
-                      _Slide(slide: slides[index], position: index),
+                  itemBuilder: (BuildContext context, int index) => _Slide(
+                    slide: slides[index],
+                    position: index,
+                    // A slide keeps its own image where the Media Team set
+                    // one. The archive only fills the empty slots.
+                    borrowedImageUrl: slides[index].hasImage || _pool.isEmpty
+                        ? null
+                        : _pool[index % _pool.length].url,
+                  ),
                 ),
                 if (slides.length > 1) ...<Widget>[
                   _ArrowButton(
@@ -211,10 +267,21 @@ const List<HeroSlide> _fallbackSlides = <HeroSlide>[
 ];
 
 class _Slide extends StatelessWidget {
-  const _Slide({required this.slide, required this.position});
+  const _Slide({
+    required this.slide,
+    required this.position,
+    this.borrowedImageUrl,
+  });
 
   final HeroSlide slide;
   final int position;
+
+  /// A photograph borrowed from the archive because this slide has none of its
+  /// own. Unknown brightness and unknown composition, which is why the scrim
+  /// below is heavier when one is in use.
+  final String? borrowedImageUrl;
+
+  bool get _hasAnyImage => slide.hasImage || borrowedImageUrl != null;
 
   /// Each slide gets its own gradient from the brand palette, so the carousel
   /// reads as five distinct panels rather than one repeated background while
@@ -236,9 +303,9 @@ class _Slide extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: <Widget>[
-        if (slide.hasImage)
+        if (_hasAnyImage)
           Image.network(
-            slide.imageUrl!,
+            slide.imageUrl ?? borrowedImageUrl!,
             fit: BoxFit.cover,
             semanticLabel: slide.imageAltText ?? slide.title,
             errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
@@ -249,16 +316,32 @@ class _Slide extends StatelessWidget {
         else
           _GradientPanel(colors: gradient),
 
-        // Scrim: keeps the overlaid text readable whatever the photograph
-        // behind it turns out to be.
+        // SCRIM — two layers, because the text has to stay readable over a
+        // photograph nobody chose for this purpose.
+        //
+        // A slide the Media Team set can be trusted: they picked it knowing
+        // words would sit on it. One borrowed at random from the archive
+        // cannot — it may be a bright sky, a white shirt, a pale wall. So the
+        // borrowed case gets a heavier wash and a floor underneath it, and
+        // legibility wins over seeing the picture perfectly.
+        if (_hasAnyImage)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: borrowedImageUrl != null ? 0.28 : 0.0),
+            ),
+          ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: <Color>[
-                Colors.black.withValues(alpha: slide.hasImage ? 0.72 : 0.30),
-                Colors.black.withValues(alpha: slide.hasImage ? 0.35 : 0.05),
+                Colors.black.withValues(
+                  alpha: !_hasAnyImage ? 0.30 : (borrowedImageUrl != null ? 0.82 : 0.72),
+                ),
+                Colors.black.withValues(
+                  alpha: !_hasAnyImage ? 0.05 : (borrowedImageUrl != null ? 0.45 : 0.35),
+                ),
               ],
             ),
           ),

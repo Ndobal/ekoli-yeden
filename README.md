@@ -105,7 +105,7 @@ ekoli-yeden/
 └── docs/                  architecture, database, contribution guidelines
 ```
 
-### Two ideas worth knowing before reading the code
+### Four ideas worth knowing before reading the code
 
 **The content registry** (`worker/src/services/content-registry.ts`) describes
 every content type in one place: its table, its writable columns, its
@@ -119,6 +119,19 @@ the database, editable by the Editorial Team without touching code. Each call
 site in Dart supplies a fallback, so the site renders correctly before the
 database is seeded and survives the API being briefly unreachable.
 
+**A photograph belongs to a year.** Every festival edition owns exactly one
+gallery, created with it. A picture from Leboku 2026 goes into that album and is
+filed under 2026 for good — and because a festival album is an ordinary row in
+`galleries`, the same picture also appears in the main Gallery section and in
+the combined photograph stream. One upload, three places it can be found,
+nothing copied.
+
+**One narrow extra authority.** Everything protected in this platform is
+decided by a permission on a role, with one deliberate exception: *administers
+this particular age grade*, one row in `age_grade_admins`. It grants nothing
+anywhere else — a person who administers Ovat cannot touch Obam, cannot reach
+the media library, cannot see a user list. See `services/age-grade.service.ts`.
+
 ---
 
 ## Roles
@@ -131,12 +144,15 @@ matters: **the Editorial Team is not the Super Admin.**
 | Super Admin | Everything, including users, roles, security and audit |
 | Content Administrator | All content; no user or security administration |
 | Heritage Editor | History, leadership, people, culture |
-| Language Editor | The Ekoli dictionary and its recordings |
+| Language Editor | The dictionary, its recordings, and the words the community proposes |
 | Media Manager | Photographs, galleries, the video archive |
 | Leboku Manager | Festival editions, programmes, festival events |
 | Moderator | Reviews community contributions |
 | Contributor | Submits material for review |
 | Public Visitor | Reads published content |
+
+And one authority that is not a role at all: an **age grade administrator**,
+appointed by their own grade, may write that grade's page and nothing else.
 
 Editorial positions split writing from publishing, so a volunteer can be
 trusted to draft without being able to make anything live:
@@ -178,6 +194,114 @@ acknowledgement survives every later edit to the article it belongs to.
 `content_sources`. A history page shows where each claim came from, and flags a
 source the archive considers contested.
 
+**What an age grade says about itself** is a third kind of statement, and the
+site keeps it apart from the other two. A grade's own post is published under
+the grade's name and labelled as the grade speaking for itself — useful, and
+not the same as something the Preservation Team has checked. A grade cannot
+publish its own page, and cannot mark itself verified: those columns are not
+writable through the routes its administrators use.
+
+---
+
+## The dictionary
+
+A word is not a row. `language_words` holds the headword; four tables hold what
+a language actually does:
+
+| | |
+|---|---|
+| `language_senses` | One row per distinct meaning, each with its own part of speech. Collapsing them into one field is what makes a second meaning unfindable. |
+| `language_examples` | The sentence in the language, its English, **and how the Lokaa is pronounced**. All three matter to a learner, and the third most — it is the part written words preserve worst. |
+| `language_variants` | How another quarter says it, an older form, a plural. Searched alongside the headword, so somebody who only knows their own family's form still finds the entry. |
+| `language_audio` | Recordings of the headword. Several per word is a feature of a language archive, not a duplicate. |
+
+A word can be several parts of speech at once — `parts_of_speech` is a list, not
+a column. Search covers headwords, variants, meanings, definitions and example
+sentences in one query, and matches a word typed without its tone marks.
+
+Contributing a word has a form of its own (`/language/contribute`) rather than
+sharing the general contribution form: an entry arrives with variants, parts of
+speech, several meanings and a sentence, and none of that survives being
+squeezed into "title" and "description". A language editor reviews something
+that already reads like a dictionary entry and accepts it in one action.
+Accepting creates a **draft, unverified** entry — "this is worth having" and
+"this is what the word means" are different statements.
+
+---
+
+## The community, and the platform it runs on
+
+The archive is one half of this. The other is the community using it, and those
+share one Okoli account — the forums, the opportunities board and the directory
+have no sign-in of their own.
+
+| Section | What it is |
+|---|---|
+| **Yakoli membership** | One account, one profile, and privacy settings that default to off. An Editorial Team volunteer may have an account and never join; a member may join years after registering. |
+| **The forums** | Three spaces. Two of them may contain minors, which decides most of the design: a members-only space is never readable anonymously, is kept out of search engines, and an author card there carries a name and nothing else. |
+| **Opportunities** | Jobs, scholarships, training and grants, ordered by what a member can do and how near it is. The fraud warning on every listing is not decoration — a fake recruiter asking for a "processing fee" borrows this archive's credibility to do it. |
+| **The directory** | Members who chose to be findable. Opt-in, enforced in the query rather than filtered afterwards. |
+| **Family and birthdays** | Who is related to whom, confirmed by both people, and the wishes a member has been sent. |
+| **Remembrance** | Nobody is removed when they die. Their account is stilled, what they made public stays public, and they are remembered in the Ancestry Records. |
+| **Messages** | Write to anybody in the community. Search a name, press send. |
+| **The places of Ekori** | Ajere, Ntan, Epenti, Afrekpe — and everything inside them. |
+
+The directory is the one part of this that requires a session. It lists real
+people with their professions and where they live, and that is not a page to
+leave open to whoever finds the address; everything else above is readable by
+anybody, and joining takes a minute.
+
+### Writing to the Preservation Team
+
+The contact page takes a message rather than offering an email address, because
+a `mailto:` is where most people on a phone stop. A message reaches every
+administrator instead of one inbox, carries its own state so two people do not
+answer it twice, and gives the sender a reference they can quote.
+
+Two topics jump the queue: *"what do you hold about me"* and *"please remove
+something about me"*. Neither needs an account — somebody asking for their own
+material to be taken down must not first have to create a record of themselves
+to ask. [Terms](/terms), [Privacy](/privacy) and [Cookies](/cookies) are linked
+from the footer of every page and describe what the platform actually does; if
+you change how something works, change them in the same commit.
+
+### You can reach somebody without being given their number
+
+That sentence is the whole design of the messaging module, and everything in it
+follows from the sentence. A member is findable by name, can be written to, and
+can reply — and at no point does either person's phone number or email address
+leave the database. A search result carries a name, a handle and a headline; a
+conversation carries messages.
+
+The thing people want from a directory is *contact*. The thing they are rightly
+unwilling to publish is *contact details*. Those are separable, and this
+separates them.
+
+If somebody does want the number — to call about a funeral, to send a document —
+they ask, with a reason the other person reads before deciding. Approving writes
+one row to `contact_grants`, and that row is the only thing in the system that
+releases a phone number: `visibleProfile()` consults it on every profile it
+shapes, uncached, so revoking takes effect on the next request. Everybody can
+see who holds their details and take them back in one press.
+
+### Three of these deserve a paragraph of their own
+
+**Remembrance is built around the wrong case.** Recording a living person as
+dead is the most damaging thing anybody can do here, and four things stand in
+the way, none of them sufficient alone: a report changes nothing; confirmation
+requires somebody who was *already* family, accepted before the report was
+filed; the account holder is told and can undo it themselves in one press, with
+no deadline and no review; and the account stays readable throughout, because an
+account locked out of contesting its own death cannot correct the mistake. The
+Preservation Team can reverse any of it at any point.
+
+**The list of places grows from what people type.** No list an administrator
+writes will ever contain every compound in Ekori, and a member whose home is
+missing from a dropdown picks the wrong thing or gives up. So the field is free
+text, every answer is kept in the member's own words, and a name that *two
+different people* give is promoted into the real list automatically — one person
+typing something is a spelling; two people typing the same thing is a place.
+
 ---
 
 ## Local development
@@ -213,6 +337,19 @@ curl http://localhost:8787/api/health/ready   # also checks D1, R2 and the secre
 cd frontend && flutter analyze && flutter test
 cd ../worker && npx tsc --noEmit
 ```
+
+### Locked out of an administrator account
+
+```bash
+cd worker
+npm run admins                                        # who holds super_admin
+node scripts/reset-password.mjs --email you@example.com
+```
+
+The reset-link flow cannot help here — generating a link needs an account that
+already works — so this writes straight to D1, using the same PBKDF2 parameters
+as the Worker. It shows the SQL, asks before writing, and revokes every existing
+session for the account. See DEPLOY.md.
 
 ---
 
@@ -296,9 +433,15 @@ never sent to the client.
 
 ## Status
 
-Modules 1 and 2 are complete and deployed. The platform is finished and the
-archive is empty — which is the correct state for a community archive on its
-first day. Every section is ready to receive verified material.
+Every module is built. Modules 1 and 2 — the archive itself and its editorial
+workspace — are deployed; the community modules (membership, the forums,
+opportunities, the directory, family and birthdays, remembrance and the places
+of Ekori) are complete in the repository and go out with the migrations listed
+in [DEPLOY.md](DEPLOY.md).
+
+The platform is finished and the archive is empty — which is the correct state
+for a community archive on its first day. Every section is ready to receive
+verified material.
 
 The one exception is the history section, which carries an **Initial Research
 Edition**: a compilation from two secondary web sources, every claim attributed

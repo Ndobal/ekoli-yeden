@@ -250,6 +250,109 @@ Preservation Team's job and it illustrates why one web source is not sufficient.
 The article ends with a section headed "What is missing", which is honest about
 how little of Ekoli-Yeden's own account is present.
 
+
+---
+
+## Migrations 0010–0013 — page content, password reset, deputy admin
+
+`0010` fills the section pages with real text. `0011` generalises Leboku into
+Festivals and adds age grades, cultural groups and cultural music. `0012` adds
+single-use password reset tokens, stored as digests. `0013` adds the Deputy
+Administrator role and `submission_uploads`.
+
+---
+
+## Migration 0014 — a gallery for every festival
+
+`galleries.festival_id` and `festivals.gallery_id` both existed and neither was
+ever filled in, so a photograph taken at the 2026 festival belonged to no year
+at all. After this every festival owns exactly one album, pointed at from both
+directions and backfilled for the editions that already exist.
+
+| Column | Why |
+|---|---|
+| `galleries.is_festival_gallery` | A festival may end up with several albums — "the wrestling", "the procession" — but exactly one is the album its page shows and new photographs default into. Flagged rather than inferred from creation order, which would silently pick the wrong one the first time somebody deleted and recreated an album. |
+| `gallery_items.contributed_by` | A photograph from the public form and one a volunteer uploads are both gallery items, but only one has somebody outside the team to thank. |
+| `gallery_items.submission_upload_id` | The link back to what was actually sent, so "is this really the photograph she gave us?" stays answerable. |
+
+The album inherits the festival's status, so preparing next year's page cannot
+put an empty album on the public site.
+
+Because a festival album is an ordinary `galleries` row, its photographs appear
+in the main Gallery section and in `GET /api/photographs` without being filed
+twice.
+
+---
+
+## Migration 0015 — a real dictionary
+
+`language_words` had one meaning, one part of speech and one example sentence
+per row. That is a glossary. Four additions make it a dictionary:
+
+| Table | Holds |
+|---|---|
+| `language_senses` | One row per distinct meaning, numbered, each with its own part of speech and definition. |
+| `language_examples` | `sentence_ekoli`, `sentence_english` **and `pronunciation`** — plus `media_asset_id` for a recording of the whole sentence, which is worth more than all three text fields. |
+| `language_variants` | Alternative forms with the quarter or family that says them. `variant_normalised` is searched alongside the headword, so looking up a variant finds the main entry. |
+| `language_parts_of_speech` | A table rather than a CHECK constraint: Lokaa grammar is not English grammar, and the categories the community's language scholars want should not need a migration. Seeded with thirteen, including `ideophone`. |
+
+On the headword itself: `parts_of_speech` (a JSON array — a word is often a noun
+*and* a verb), `phonetic_respelling`, `ipa`, `tone_pattern`, `plural_form`,
+`literal_translation`, `usage_notes`, `register`, `etymology`, `see_also`.
+
+`word_normalised` is the headword lowercased and stripped of diacritics, so
+somebody typing on a phone keyboard without tone marks still finds the word. It
+is derived by the Worker on every write and is deliberately **not** a writable
+column. `initial_letter` drives the A–Z index — stored rather than computed, so
+the index is one indexed read instead of a scan.
+
+The old columns are kept and backfilled rather than dropped: every existing
+entry stays readable, and its meaning becomes sense 1.
+
+`word_submissions` is a queue of its own. A word arrives with variants, parts of
+speech, several meanings and a sentence, none of which fit "title" and
+"description" — so it is held as structured JSON in the same shape the tables
+above use, and promoting it is a copy rather than a re-typing.
+
+---
+
+## Migration 0016 — age grades that run themselves
+
+An age grade was an article in `content_items` that only a Heritage Editor could
+write. That is the wrong shape: the people who know what a grade has been doing
+this year are its own members.
+
+| Table | Holds |
+|---|---|
+| `age_grades` | The grade. A table of its own rather than another shelf in `content_items`, because rows that own other rows do not belong in a shared-discriminator table. |
+| `age_grade_admins` | Who may speak for this grade. `lead` may appoint and remove; `admin` may write. |
+| `age_grade_members` | The roster. `user_id` is nullable and usually null — most members will never hold an account here, and a roster that lists only the ones who do is not a roster. |
+| `age_grade_posts` | The grade's own news, published under the grade's name. |
+
+The article already written is migrated across **keeping its id**, because
+`content_sources` and `content_contributors` reference it by
+`('age_grades', id)`. Changing the id would orphan every citation attached to it.
+The original row is marked `age_grades_migrated` rather than deleted — a
+migration that destroys rows is one nobody can safely re-run.
+
+### The authorisation this introduces
+
+One new axis, deliberately the narrowest in the platform: **administers this
+particular age grade**. It is one row in `age_grade_admins`, it is not a
+platform role, and it grants nothing anywhere else. A person who administers
+Ovat cannot touch Obam, cannot reach the media library, cannot see a user list.
+
+What the grade controls: its description, its roster, its posts, its
+photographs. What it does not: whether its page is published at all, and whether
+the archive marks it verified. `AgeGradeRepository.updateOwnFields` cannot write
+`status` or `verification_status`, and there is no route through which it can.
+
+Three settings govern how much autonomy the grades have —
+`age_grades_self_registration`, `age_grade_posts_require_review` (off by
+default: an update that waits a week for an editor is an update that stops being
+written) and `age_grade_members_require_review` (on by default, because a living
+person's name is personal data).
+
 ---
 
 ## Useful queries

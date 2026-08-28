@@ -34,8 +34,47 @@ const STATIC_PAGES = [
   { path: '/businesses', priority: '0.6', changefreq: 'weekly' },
   { path: '/organizations', priority: '0.6', changefreq: 'monthly' },
   { path: '/contribute', priority: '0.8', changefreq: 'monthly' },
+  { path: '/language/contribute', priority: '0.7', changefreq: 'monthly' },
+  { path: '/age-grades/register', priority: '0.6', changefreq: 'monthly' },
+  { path: '/gallery/photographs', priority: '0.7', changefreq: 'weekly' },
+  { path: '/ancestry', priority: '0.8', changefreq: 'weekly' },
+  { path: '/places', priority: '0.7', changefreq: 'monthly' },
+  // The forum index only. A conversation is not offered to a crawler — see the
+  // note in `_middleware.js`.
+  { path: '/community/forums', priority: '0.6', changefreq: 'daily' },
+  { path: '/news/submit', priority: '0.5', changefreq: 'monthly' },
   { path: '/preservation-team', priority: '0.7', changefreq: 'monthly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
+  { path: '/terms', priority: '0.4', changefreq: 'yearly' },
+  { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
+  { path: '/cookies', priority: '0.3', changefreq: 'yearly' },
+];
+
+/**
+ * The areas of the cultural archive.
+ *
+ * Listed explicitly because they are defined in the Flutter client rather than
+ * in the database — they are the shape of the section, not records in it. Each
+ * is a real address a search engine should know about, and each is where
+ * somebody searching for "Ekoli-Yeden food" should land.
+ *
+ * Keep in step with `cultureAreas` in
+ * `frontend/lib/features/culture/culture_pages.dart`.
+ */
+const CULTURE_AREAS = [
+  'language',
+  'leboku',
+  'traditional-practices',
+  'wrestling',
+  'dances',
+  'food',
+  'clothing',
+  'agriculture',
+  'proverbs',
+  'folklore',
+  'oral-history',
+  'traditional-institutions',
+  'community-life',
 ];
 
 /** Content types to enumerate, and the public path each lives under. */
@@ -54,6 +93,11 @@ const CONTENT = [
   { resource: 'age-grades', path: '/age-grades', priority: '0.6' },
   { resource: 'cultural-groups', path: '/cultural-groups', priority: '0.6' },
   { resource: 'music', path: '/music', priority: '0.6' },
+  // The people the community came from, and the places it is made of. Both are
+  // published records like any other section, and both are what somebody
+  // searching a family name should find.
+  { resource: 'ancestry', path: '/ancestry', priority: '0.7' },
+  { resource: 'places', path: '/places', priority: '0.6' },
 ];
 
 export async function onRequest() {
@@ -88,6 +132,15 @@ export async function onRequest() {
   );
 
   for (const group of collected) entries.push(...group);
+
+  for (const area of CULTURE_AREAS) {
+    entries.push({
+      loc: `${SITE}/culture/area/${area}`,
+      priority: '0.7',
+      changefreq: 'monthly',
+      lastmod: null,
+    });
+  }
 
   // Festivals sit at their own path.
   try {

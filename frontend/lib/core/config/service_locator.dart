@@ -4,11 +4,25 @@ import 'package:provider/single_child_widget.dart';
 
 import '../../repositories/account_repository.dart';
 import '../../repositories/admin_repository.dart';
+import '../../repositories/age_grade_repository.dart';
 import '../../repositories/cms_repository.dart';
+import '../../repositories/contact_repository.dart';
 import '../../repositories/content_repository.dart';
 import '../../repositories/festival_repository.dart';
+import '../../repositories/event_repository.dart';
+import '../../repositories/forum_repository.dart';
+import '../../repositories/gallery_repository.dart';
+import '../../repositories/group_repository.dart';
+import '../../repositories/kinship_repository.dart';
 import '../../repositories/language_repository.dart';
 import '../../repositories/media_repository.dart';
+import '../../repositories/member_repository.dart';
+import '../../repositories/message_repository.dart';
+import '../../repositories/news_repository.dart';
+import '../../repositories/opportunity_repository.dart';
+import '../../repositories/people_repository.dart';
+import '../../repositories/place_repository.dart';
+import '../../repositories/remembrance_repository.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/submission_repository.dart';
 import '../../repositories/video_repository.dart';
@@ -44,7 +58,21 @@ class ServiceLocator {
 
       Provider<SettingsRepository>(create: (_) => SettingsRepository(api)),
       Provider<CmsRepository>(create: (_) => CmsRepository(api)),
+      Provider<ContactRepository>(create: (_) => ContactRepository(api)),
       Provider<FestivalRepository>(create: (_) => FestivalRepository(api)),
+      Provider<GalleryRepository>(create: (_) => GalleryRepository(api)),
+      Provider<GroupRepository>(create: (_) => GroupRepository(api)),
+      Provider<EventRepository>(create: (_) => EventRepository(api)),
+      Provider<ForumRepository>(create: (_) => ForumRepository(api)),
+      Provider<NewsRepository>(create: (_) => NewsRepository(api)),
+      Provider<OpportunityRepository>(create: (_) => OpportunityRepository(api)),
+      Provider<KinshipRepository>(create: (_) => KinshipRepository(api)),
+      Provider<RemembranceRepository>(create: (_) => RemembranceRepository(api)),
+      Provider<PeopleRepository>(create: (_) => PeopleRepository(api)),
+      Provider<PlaceRepository>(create: (_) => PlaceRepository(api)),
+      Provider<AgeGradeRepository>(create: (_) => AgeGradeRepository(api)),
+      Provider<MemberRepository>(create: (_) => MemberRepository(api)),
+      Provider<MessageRepository>(create: (_) => MessageRepository(api)),
       Provider<LanguageRepository>(create: (_) => LanguageRepository(api)),
       Provider<VideoRepository>(create: (_) => VideoRepository(api)),
       Provider<MediaRepository>(create: (_) => MediaRepository(api)),

@@ -34,7 +34,9 @@ class SubmissionRepository {
   }) async {
     final Map<String, dynamic> data = await _api.post(
       '/api/contribute',
-      authenticated: false,
+      // Contributing requires a membership; the request has to carry the
+      // session or it is refused before it is read.
+      authenticated: true,
       body: <String, dynamic>{
         'submission_type': submissionType,
         'title': title,

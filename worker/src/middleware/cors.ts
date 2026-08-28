@@ -5,8 +5,30 @@ import type { Env } from '../types/env';
  *
  * The origin allow-list comes from `ALLOWED_ORIGINS` in wrangler.jsonc, one
  * value per environment. There is no `*` fallback: the API carries credentials
- * and admin operations, so an unknown origin simply receives no CORS headers
- * and the browser blocks the response.
+ * and admin operations, so an unknown origin receives no CORS headers and the
+ * browser blocks the response.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS THE MOST DANGEROUS FILE IN THE WORKER TO GET SLIGHTLY WRONG
+ * ---------------------------------------------------------------------------
+ *
+ * A browser does not tell a page WHY a cross-origin request failed. A rejected
+ * origin and an unplugged network cable are the same event to JavaScript, so
+ * the archive told people "we could not reach the archive. Please check your
+ * internet connection" while the connection was perfectly fine and the server
+ * was answering every request correctly.
+ *
+ * That is exactly what happened: the allow-list held one exact string, and
+ * every Cloudflare Pages preview deployment gets its own hostname
+ * (`https://32ade2f8.ekoli.pages.dev`). Anybody following one of those links —
+ * and every deploy prints one — could read the site, because reading is
+ * same-origin static hosting, and could not register, sign in, or do anything
+ * at all that touched the API.
+ *
+ * So exact strings are still the rule, and a single deliberate pattern is
+ * allowed alongside them: an entry beginning `*.` matches that host's
+ * subdomains. It is opt-in per environment, it never matches the apex on its
+ * own, and it is not a wildcard for the whole internet.
  */
 export function allowedOrigins(env: Env): string[] {
   return env.ALLOWED_ORIGINS.split(',')
@@ -14,10 +36,40 @@ export function allowedOrigins(env: Env): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+/**
+ * Whether one allow-list entry admits this origin.
+ *
+ * `https://*.ekoli.pages.dev` admits `https://abc123.ekoli.pages.dev` and
+ * `https://ekoli.pages.dev` is a separate entry — a pattern deliberately does
+ * not admit its own apex, so removing the apex from the list actually removes
+ * it.
+ *
+ * The scheme is compared too. `http://evil.ekoli.pages.dev` is not admitted by
+ * an `https://` pattern, and the dot before the host is required so that
+ * `https://*.ekoli.pages.dev` cannot be satisfied by `https://notekoli.pages.dev`.
+ */
+function admits(entry: string, origin: string): boolean {
+  if (entry === origin) return true;
+
+  const marker = '://*.';
+  const at = entry.indexOf(marker);
+  if (at < 0) return false;
+
+  const scheme = entry.slice(0, at + 3);
+  const host = entry.slice(at + marker.length);
+  if (host.length === 0) return false;
+
+  return origin.startsWith(scheme) && origin.endsWith(`.${host}`);
+}
+
 export function resolveOrigin(request: Request, env: Env): string | null {
   const origin = request.headers.get('origin');
   if (!origin) return null;
-  return allowedOrigins(env).includes(origin) ? origin : null;
+
+  // The origin is echoed back only after matching. Never reflected blindly:
+  // the API carries credentials, and reflecting an arbitrary origin with
+  // `allow-credentials` hands every site on the internet a signed-in session.
+  return allowedOrigins(env).some((entry) => admits(entry, origin)) ? origin : null;
 }
 
 export function corsHeaders(request: Request, env: Env): Record<string, string> {
@@ -37,7 +89,24 @@ export function handlePreflight(request: Request, env: Env): Response | null {
   if (!request.headers.get('access-control-request-method')) return null;
 
   const origin = resolveOrigin(request, env);
-  if (!origin) return new Response(null, { status: 403 });
+  if (!origin) {
+    // A body, rather than a bare 403. JavaScript cannot read it — that is the
+    // whole nature of a CORS rejection — but a person looking at the Network
+    // tab, or anybody running curl to find out why registration is failing,
+    // gets told what is actually wrong instead of guessing.
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: {
+          code: 'ORIGIN_NOT_ALLOWED',
+          message:
+            `The origin ${request.headers.get('origin') ?? 'unknown'} is not on this API's `
+            + 'allow-list, so the browser will block the response. Add it to ALLOWED_ORIGINS.',
+        },
+      }),
+      { status: 403, headers: { 'content-type': 'application/json; charset=utf-8' } },
+    );
+  }
 
   return new Response(null, {
     status: 204,

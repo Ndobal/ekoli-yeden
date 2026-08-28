@@ -44,6 +44,14 @@ class AuthController extends ChangeNotifier {
   bool get canPublish => _user?.canPublish ?? false;
   bool get canReview => _user?.canReview ?? false;
 
+  /// Whether this account has completed its Okoli membership.
+  bool get isMember => _user?.isMember ?? false;
+
+  /// Whether this account may send material to the archive.
+  ///
+  /// Contributing requires a membership. Reading never does.
+  bool get canContribute => _user?.canContribute ?? false;
+
   /// Restores a session from storage on startup.
   Future<void> restore() async {
     final AppUser? restored = await _service.currentUser();
@@ -74,7 +82,12 @@ class AuthController extends ChangeNotifier {
   }) async {
     _setBusy(true);
     try {
-      await _service.register(email: email, password: password, displayName: displayName);
+      _user = await _service.register(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      _status = AuthStatus.signedIn;
       _errorMessage = null;
       return true;
     } on AppException catch (error) {

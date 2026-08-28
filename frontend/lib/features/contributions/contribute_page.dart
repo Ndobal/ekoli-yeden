@@ -15,6 +15,9 @@ import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../repositories/account_repository.dart';
 import '../../repositories/submission_repository.dart';
+import '../../services/api/mime_types.dart';
+import '../../models/user.dart';
+import '../../services/auth/auth_controller.dart';
 import '../about/about_pages.dart';
 
 /// CONTRIBUTE TO EKOLI YEDEN.
@@ -60,6 +63,33 @@ class _ContributePageState extends State<ContributePage> {
     if (widget.about != null) {
       _description.text = 'Regarding: ${widget.about}\n\n';
     }
+  }
+
+  /// Whether the signed-in member's details have been filled in yet.
+  bool _prefilled = false;
+
+  /// Fills in what the archive already knows about the person contributing.
+  ///
+  /// ASKING A SIGNED-IN MEMBER FOR THEIR OWN NAME IS ASKING THEM TO PROVE
+  /// SOMETHING THE ARCHIVE ALREADY KNOWS.
+  ///
+  /// They are signed in; the account has a name and an email on it. Making
+  /// them type both again is friction with no purpose, and it is friction at
+  /// exactly the moment somebody is doing the archive a favour.
+  ///
+  /// They stay editable. Somebody contributing on behalf of an elder should be
+  /// able to put the elder's name in, and the fields are prefilled rather than
+  /// locked so that remains possible.
+  void _prefillFromAccount() {
+    if (_prefilled) return;
+
+    final AuthController auth = context.read<AuthController>();
+    final AppUser? user = auth.user;
+    if (user == null) return;
+
+    _prefilled = true;
+    if (_name.text.trim().isEmpty) _name.text = user.displayName;
+    if (_email.text.trim().isEmpty) _email.text = user.email;
   }
 
   @override
@@ -134,7 +164,15 @@ class _ContributePageState extends State<ContributePage> {
           ),
           PageSection(
             reading: true,
-            child: _receipt != null ? _Receipt(receipt: _receipt!) : _buildForm(context),
+            // Contributing requires a membership, so the form is not drawn for
+            // somebody who cannot submit it. Showing a form that fails on the
+            // last click, after they have chosen files and typed what they
+            // know about a photograph, is the worst possible moment to say so.
+            child: _receipt != null
+                ? _Receipt(receipt: _receipt!)
+                : context.watch<AuthController>().canContribute
+                    ? _buildForm(context)
+                    : const _MembershipGate(),
           ),
         ],
       ),
@@ -143,6 +181,7 @@ class _ContributePageState extends State<ContributePage> {
 
   Widget _buildForm(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    _prefillFromAccount();
 
     return Form(
       key: _formKey,
@@ -199,8 +238,10 @@ class _ContributePageState extends State<ContributePage> {
           Text('About you', style: theme.textTheme.titleMedium),
           const Gap.xs(),
           Text(
-            'So the Preservation Team can credit you and follow up if they have questions. '
-            'You may leave these blank.',
+            context.watch<AuthController>().isSignedIn
+                ? 'Taken from your account. Change any of it if you are sending this on somebody '
+                    'else\'s behalf.'
+                : 'So the Preservation Team can credit you and follow up if they have questions.',
             style: theme.textTheme.bodySmall,
           ),
           const Gap.lg(),
@@ -341,15 +382,28 @@ class _ContributionFilePickerState extends State<ContributionFilePicker> {
     super.dispose();
   }
 
+  /// What the picker offers, scoped to the chosen folder.
+  ///
+  /// Taken from `UploadExtensions` rather than written out again here, so a
+  /// type the API accepts cannot quietly become a type nobody can select —
+  /// which is exactly how video came to be unpickable across the whole
+  /// platform while the server was the only place the decision was recorded.
   List<String> get _extensions {
     switch (_folder) {
       case MediaFolders.audio:
+        return UploadExtensions.audio;
       case MediaFolders.language:
-        return <String>['mp3', 'm4a', 'aac', 'ogg', 'wav'];
+        // Video belongs here more than anywhere: a recording of somebody's
+        // mouth forming a word teaches what an audio file cannot.
+        return <String>[
+          ...UploadExtensions.audio,
+          ...UploadExtensions.video,
+          ...UploadExtensions.images,
+        ];
       case MediaFolders.documents:
-        return <String>['pdf', 'doc', 'docx', 'txt'];
+        return UploadExtensions.documents;
       default:
-        return <String>['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf'];
+        return <String>[...UploadExtensions.gallery, 'pdf'];
     }
   }
 
@@ -659,6 +713,93 @@ class _Receipt extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+
+/// BECOME A MEMBER FIRST.
+///
+/// Contributing is for members. This is the screen somebody meets instead of
+/// the form, and it has one job: make joining feel like the obvious next step
+/// rather than a toll gate.
+///
+/// So it says why. A photograph is worth what is known about it, and when the
+/// Preservation Team cannot tell who is pictured or when, the only way to find
+/// out is to ask whoever sent it. An anonymous upload leaves nobody to ask —
+/// which is a real loss to the archive, not a policy preference.
+class _MembershipGate extends StatelessWidget {
+  const _MembershipGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final AuthController auth = context.watch<AuthController>();
+    final bool signedIn = auth.isSignedIn;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: AppRadius.mdAll,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.groups_outlined, color: AppColors.green),
+              const Gap.hMd(),
+              Expanded(
+                child: Text(
+                  signedIn
+                      ? 'One more step before you can contribute'
+                      : 'Contributing is for members of Ekoli-Yeden',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const Gap.lg(),
+          Text(
+            'Everything in this archive is free to read, and always will be — you do not need an '
+            'account for that.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const Gap.md(),
+          Text(
+            'Contributing is different. A photograph is worth what is known about it: who is in '
+            'it, where it was taken, roughly when. When we cannot tell, the only way to find out '
+            'is to ask the person who sent it — and there is no way to ask somebody we cannot '
+            'reach. Being a member is what lets us credit you properly and come back to you with '
+            'a question years later.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const Gap.xl(),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
+            children: <Widget>[
+              FilledButton.icon(
+                onPressed: () => context.go(AppRoutes.join),
+                icon: const Icon(Icons.person_add_alt, size: 18),
+                label: Text(signedIn ? 'Complete your membership' : 'Become a member'),
+              ),
+              if (!signedIn)
+                OutlinedButton(
+                  onPressed: () =>
+                      context.go(AppRoutes.signInReturningTo(AppRoutes.contribute)),
+                  child: const Text('I already have an account'),
+                ),
+            ],
+          ),
+          const Gap.lg(),
+          Text(
+            'It takes a name, an email and a moment. There is no fee.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 }

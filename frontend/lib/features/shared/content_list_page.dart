@@ -35,6 +35,7 @@ class ContentListPage extends StatefulWidget {
     this.showVerification = false,
     this.maxColumns = 3,
     this.searchable = true,
+    this.footer,
     super.key,
   });
 
@@ -63,6 +64,13 @@ class ContentListPage extends StatefulWidget {
   final bool showVerification;
   final int maxColumns;
   final bool searchable;
+
+  /// Rendered below the list, whether or not the list has anything in it.
+  ///
+  /// Used by the Gallery, which shows its albums and then every photograph
+  /// across all of them — two different questions about the same records, and
+  /// the second one is not worth a page of its own on the way in.
+  final Widget? footer;
 
   @override
   State<ContentListPage> createState() => _ContentListPageState();
@@ -141,15 +149,21 @@ class _ContentListPageState extends State<ContentListPage> {
               load: () => repository.list(page: _page, search: _search.isEmpty ? null : _search),
               loadingMessage: 'Opening the archive…',
               isEmpty: (PaginatedResult<ContentRecord> result) => result.isEmpty,
-              emptyBuilder: (BuildContext context) => EmptyView(
-                title: _search.isEmpty
-                    ? (widget.emptyTitle ?? 'Nothing recorded yet')
-                    : 'No results for “$_search”',
-                message: _search.isEmpty
-                    ? (widget.emptyMessage ??
-                        'This part of the archive is ready and waiting for verified material from the community.')
-                    : 'Try a different search, or browse everything by clearing the search box.',
-                showContributeAction: _search.isEmpty,
+              emptyBuilder: (BuildContext context) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  EmptyView(
+                    title: _search.isEmpty
+                        ? (widget.emptyTitle ?? 'Nothing recorded yet')
+                        : 'No results for “$_search”',
+                    message: _search.isEmpty
+                        ? (widget.emptyMessage ??
+                            'This part of the archive is ready and waiting for verified material from the community.')
+                        : 'Try a different search, or browse everything by clearing the search box.',
+                    showContributeAction: _search.isEmpty,
+                  ),
+                  ?widget.footer,
+                ],
               ),
               builder: (BuildContext context, PaginatedResult<ContentRecord> result) {
                 return Column(
@@ -177,6 +191,7 @@ class _ContentListPageState extends State<ContentListPage> {
                         onChanged: (int page) => setState(() => _page = page),
                       ),
                     ],
+                    ?widget.footer,
                   ],
                 );
               },

@@ -142,11 +142,19 @@ export class PasswordResetService {
    * needed because somebody else had access, leaving their session alive would
    * defeat the point.
    */
+  /**
+   * Spends a reset token and sets the new password.
+   *
+   * Returns the account, so the caller can sign them straight in. Somebody who
+   * has just proved control of the account and chosen a password should not
+   * then be asked to type it again into a sign-in form from memory — that step
+   * only loses people, and it protects nothing that the token did not already.
+   */
   async redeem(
     token: string,
     newPassword: string,
     context: { requestId: string; ipHash: string | null },
-  ): Promise<void> {
+  ): Promise<{ id: string; email: string }> {
     const record = await this.findValidToken(token);
     if (!record) {
       throw new BadRequestError(
@@ -158,7 +166,15 @@ export class PasswordResetService {
     if (!user) throw new BadRequestError('That reset link is no longer valid.');
 
     const { hash, salt } = await hashPassword(newPassword);
-    await this.users.update(user.id, { password_hash: hash, password_salt: salt });
+    await this.users.update(user.id, {
+      password_hash: hash,
+      password_salt: salt,
+      // Choosing a password clears any temporary one. This is the step a
+      // temporary password exists to force, so it must be the step that
+      // releases the account.
+      must_change_password: 0,
+      password_changed_at: nowIso(),
+    });
 
     await this.env.DB.prepare(
       'UPDATE "password_reset_tokens" SET "used_at" = ? WHERE "id" = ?',
@@ -178,6 +194,8 @@ export class PasswordResetService {
       ipHash: context.ipHash,
       requestId: context.requestId,
     });
+
+    return { id: user.id, email: user.email };
   }
 
   /** Confirms a token is usable, so the form can refuse early and clearly. */

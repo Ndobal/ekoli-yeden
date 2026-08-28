@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../config/cms_controller.dart';
+import '../errors/app_exception.dart';
 import '../config/site_settings_controller.dart';
 import '../routing/app_routes.dart';
 import '../theme/app_colors.dart';
@@ -10,6 +13,7 @@ import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../utils/responsive.dart';
 import '../../repositories/cms_repository.dart';
+import '../../repositories/message_repository.dart';
 import '../../repositories/settings_repository.dart';
 import '../../services/auth/auth_controller.dart';
 import 'brand_logo.dart';
@@ -120,7 +124,13 @@ class _Header extends StatelessWidget {
                     tooltip: context.cms('system.search', fallback: 'Search the archive'),
                     onPressed: () => context.go(AppRoutes.search),
                   ),
-                  if (wide) ...<Widget>[const Gap.hSm(), const _AccountButton()],
+                  if (wide) ...<Widget>[
+                    // Only for somebody signed in: a messages button that
+                    // always shows nothing is furniture.
+                    if (context.watch<AuthController>().isSignedIn) const MessagesButton(),
+                    const Gap.hSm(),
+                    const _AccountButton(),
+                  ],
                 ],
               ),
             ),
@@ -300,6 +310,86 @@ class _NavLink extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The messages button, with the number waiting on it.
+///
+/// In the header rather than only in the navigation menu, because an unread
+/// count nobody can see is an unread count nobody answers. It polls quietly
+/// while the tab is open — a minute is often enough for a community archive,
+/// and it costs one small request.
+class MessagesButton extends StatefulWidget {
+  const MessagesButton({super.key});
+
+  @override
+  State<MessagesButton> createState() => _MessagesButtonState();
+}
+
+class _MessagesButtonState extends State<MessagesButton> {
+  int _unread = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _poll = Timer.periodic(const Duration(seconds: 60), (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    if (!context.read<AuthController>().isSignedIn) return;
+    try {
+      final int unread = await context.read<MessageRepository>().unread();
+      if (mounted) setState(() => _unread = unread);
+    } on AppException {
+      // A badge is not worth an error message. It simply stays as it was.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        IconButton(
+          tooltip: 'Messages',
+          icon: const Icon(Icons.chat_bubble_outline, size: 20),
+          onPressed: () => context.go(AppRoutes.messages),
+        ),
+        if (_unread > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.gold,
+                borderRadius: AppRadius.pillAll,
+                border: Border.all(color: theme.colorScheme.surface, width: 1.5),
+              ),
+              constraints: const BoxConstraints(minWidth: 18),
+              child: Text(
+                _unread > 99 ? '99+' : '$_unread',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -614,6 +704,31 @@ class _Footer extends StatelessWidget {
 
             const Gap.xxl(),
             const Divider(color: OnDark.divider, height: 1),
+            const Gap.lg(),
+
+            // The policy links, where every site puts them and where people
+            // therefore look. Reachable without an account, because somebody
+            // deciding whether to make one needs to read them first.
+            Wrap(
+              spacing: AppSpacing.xl,
+              runSpacing: AppSpacing.sm,
+              children: <Widget>[
+                for (final ({String label, String path}) link
+                    in const <({String label, String path})>[
+                      (label: 'Terms of use', path: AppRoutes.terms),
+                      (label: 'Privacy', path: AppRoutes.privacy),
+                      (label: 'Cookies', path: AppRoutes.cookies),
+                      (label: 'Contact us', path: AppRoutes.contact),
+                    ])
+                  InkWell(
+                    onTap: () => context.go(link.path),
+                    child: Text(
+                      link.label,
+                      style: theme.textTheme.bodySmall?.copyWith(color: OnDark.body),
+                    ),
+                  ),
+              ],
+            ),
             const Gap.lg(),
 
             // The bottom line wraps rather than overflowing on a phone.

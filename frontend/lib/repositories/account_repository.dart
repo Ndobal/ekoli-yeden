@@ -114,7 +114,11 @@ class AccountRepository {
       bytes: bytes,
       filename: filename,
       folder: folder,
-      authenticated: false,
+      // MUST carry the session. Contributing requires a membership, and this
+      // request used to be sent with no Authorization header at all — so every
+      // upload 401d the moment that rule arrived, including an administrator
+      // uploading from their own workspace.
+      authenticated: true,
       fields: <String, String>{
         'usage_permission': usagePermission,
         'caption': ?caption,
@@ -139,11 +143,31 @@ class AccountRepository {
     );
   }
 
-  Future<void> approveContribution(String id, {String? notes}) async {
-    await _api.post(
+  /// Approves a contributed file, and optionally finishes the job.
+  ///
+  /// Approving alone only accessions the file: it becomes a media asset that
+  /// no visitor can see, in no album. [galleryId] files it somewhere findable
+  /// and [publish] puts it on the site. Both are the reviewer's choice, but
+  /// leaving both off is how seven contributions to this archive ended up
+  /// approved and invisible.
+  ///
+  /// Returns the API's account of what actually happened, which the screen
+  /// shows verbatim rather than assuming success means "it is live".
+  Future<String> approveContribution(
+    String id, {
+    String? notes,
+    String? galleryId,
+    bool publish = false,
+  }) async {
+    final Map<String, dynamic> data = await _api.post(
       '/api/admin/contributions/$id/approve',
-      body: <String, dynamic>{'review_notes': ?notes},
+      body: <String, dynamic>{
+        'review_notes': ?notes,
+        'gallery_id': ?galleryId,
+        'publish': publish,
+      },
     );
+    return Json.str(data, 'message', fallback: 'Approved.');
   }
 
   Future<void> rejectContribution(String id, {String? notes}) async {

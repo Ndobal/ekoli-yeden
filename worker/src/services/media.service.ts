@@ -3,7 +3,16 @@ import type { Env } from '../types/env';
 import type { AuthenticatedUser } from '../types/auth';
 import { CONTENT_STATUS } from '../types/models';
 import { BadRequestError, NotFoundError } from '../utils/errors';
-import { assertUploadAllowed, buildStorageKey, isR2Folder, publicMediaUrl, sanitizeFilename, type R2Folder } from '../utils/files';
+import {
+  assertContentMatchesType,
+  assertUploadAllowed,
+  buildStorageKey,
+  isR2Folder,
+  publicMediaUrl,
+  resolveMimeType,
+  sanitizeFilename,
+  type R2Folder,
+} from '../utils/files';
 import { sha256 } from '../utils/crypto';
 
 /**
@@ -47,14 +56,19 @@ export class MediaService {
     }
     const folder: R2Folder = folderValue;
 
-    const mimeType = file.type || 'application/octet-stream';
     const filename = sanitizeFilename(file.name || 'upload');
+    // Browsers frequently send nothing, or `application/octet-stream`, for a
+    // file picked on a phone. Falling back to the filename is what stops an
+    // ordinary photograph being refused as an unknown binary.
+    const mimeType = resolveMimeType(file.type, filename);
 
     assertUploadAllowed({ folder, mimeType, sizeBytes: file.size, filename }, this.maxBytes);
 
     const bytes = await file.arrayBuffer();
     // Re-check after reading: `File.size` is client-reported metadata.
     assertUploadAllowed({ folder, mimeType, sizeBytes: bytes.byteLength, filename }, this.maxBytes);
+    // And the bytes themselves, so a renamed executable is not stored as an image.
+    assertContentMatchesType(bytes, mimeType);
 
     const storageKey = buildStorageKey(folder, mimeType, filename);
     const checksum = await sha256(bytes);

@@ -307,7 +307,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               autofocus: true,
               decoration: InputDecoration(
                 labelText: 'New password',
-                helperText: 'At least 12 characters. A short phrase works well.',
+                helperText: 'At least six characters. A short phrase works well, and common passwords are refused.',
                 suffixIcon: IconButton(
                   icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                   tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -315,7 +315,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 ),
               ),
               validator: (String? value) =>
-                  (value == null || value.length < 12) ? 'Please use at least 12 characters.' : null,
+                  (value == null || value.length < 6) ? 'Please use at least six characters.' : null,
             ),
             const Gap.lg(),
             TextFormField(

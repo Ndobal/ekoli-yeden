@@ -1,7 +1,10 @@
 import type { RequestContext } from '../types/api';
 import { AuthService } from '../services/auth.service';
+import { PasswordResetService } from '../services/password-reset.service';
+import { UserRepository } from '../repositories/user.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
 import { UnauthorizedError } from '../utils/errors';
+import { assertUsablePassword } from '../utils/password-quality';
 import { hashIp, requireSecret } from '../utils/crypto';
 import { readJsonBody, Validator } from '../utils/validation';
 import { NO_STORE_HEADERS, json } from '../utils/responses';
@@ -21,9 +24,17 @@ export async function register(context: RequestContext): Promise<Response> {
   const body = await readJsonBody(context.request);
   const validated = new Validator(body)
     .email('email', { required: true })
-    .string('password', { required: true, min: 12, max: 200, label: 'Password' })
+    .string('password', { required: true, min: 6, max: 200, label: 'Password' })
     .string('display_name', { required: true, min: 2, max: 120, label: 'Name' })
     .validated();
+
+  // Six characters is the minimum, which is short on purpose — and a short
+  // minimum is only safe if the guessable answers are refused. See
+  // `password-quality.ts`.
+  assertUsablePassword(validated['password'] as string, {
+    email: validated['email'] as string,
+    displayName: validated['display_name'] as string,
+  });
 
   const auth = new AuthService(context.env);
   const userId = await auth.register({
@@ -43,10 +54,48 @@ export async function register(context: RequestContext): Promise<Response> {
     requestId: context.requestId,
   });
 
+  // SIGNED IN IMMEDIATELY, RATHER THAN SENT BACK TO A SIGN-IN FORM.
+  //
+  // Somebody who has just chosen a password and typed it correctly has proved
+  // exactly what the sign-in form would ask them to prove, thirty seconds
+  // later, from memory. Making them do it again is a step that only loses
+  // people — and the next thing they need is their dashboard, where the
+  // membership is actually completed.
+  const secret = requireSecret(context.env.JWT_SECRET, 'JWT_SECRET');
+  const ipHash = await hashIp(clientIp(context.request), secret);
+  const tokens = await auth.issueTokens(userId, validated['email'] as string, {
+    userAgent: context.request.headers.get('user-agent'),
+    ipHash,
+  });
+
+  await audit.record({
+    actorId: userId,
+    actorEmail: validated['email'] as string,
+    action: AUDIT_ACTIONS.LOGIN_SUCCEEDED,
+    resourceType: 'user',
+    resourceId: userId,
+    ipHash,
+    userAgent: context.request.headers.get('user-agent'),
+    changes: { via: 'registration' },
+    requestId: context.requestId,
+  });
+
   return json(
     {
       id: userId,
-      message: 'Your account has been created. You may now sign in and contribute materials for review.',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      user: {
+        id: userId,
+        email: validated['email'] as string,
+        displayName: validated['display_name'] as string,
+        status: 'active',
+        roles: ['contributor'],
+        permissions: [],
+        isMember: false,
+      },
+      message: 'Welcome. Your account is ready — the next step is your membership.',
     },
     { status: 201, headers: NO_STORE_HEADERS },
   );
@@ -67,6 +116,77 @@ export async function login(context: RequestContext): Promise<Response> {
 
   try {
     const user = await auth.authenticate(email, validated['password'] as string);
+
+    // A TEMPORARY PASSWORD BUYS EXACTLY ONE THING: THE RIGHT TO CHOOSE A REAL
+    // ONE.
+    //
+    // Without this, an administrator who read a temporary password down the
+    // phone would hold a working credential for that account indefinitely, and
+    // the "temporary" in its name would be decoration. So no session is issued
+    // at all — instead the account is handed a single-use reset token and sent
+    // to choose a password, and redeeming that signs them in properly.
+    const record = await new UserRepository(context.env.DB).findById(user.id);
+    if (record?.must_change_password === 1) {
+      // AND IT STOPS WORKING.
+      //
+      // A temporary password is read out over a phone line, written on paper,
+      // and forwarded in a chat. Without an expiry, one issued in March is a
+      // working credential in December for anybody who kept the note — and the
+      // account holder, who never signed in, has no idea it exists.
+      //
+      // The window comes from `temp_password_ttl_hours` in the security
+      // settings rather than a constant here, because the right value depends
+      // on how quickly this community actually reaches each other.
+      if (await temporaryPasswordExpired(context, record.temp_password_issued_at)) {
+        await audit.record({
+          actorId: user.id,
+          actorEmail: user.email,
+          action: 'auth.temporary_password.expired',
+          resourceType: 'user',
+          resourceId: user.id,
+          ipHash,
+          requestId: context.requestId,
+        });
+
+        throw new UnauthorizedError(
+          'That temporary password has expired. Ask an administrator for a new one, or use '
+            + '"Forgot password" to have a link sent to you.',
+        );
+      }
+
+      const handover = await new PasswordResetService(context.env).issue(record, {
+        requestedBy: user.id,
+        ipHash,
+        requestId: context.requestId,
+        // Not sent anywhere. They are already here, holding the temporary
+        // password; posting a link to an address they may not reach would only
+        // put them back where they started.
+        preferChannel: undefined,
+      });
+
+      await audit.record({
+        actorId: user.id,
+        actorEmail: user.email,
+        action: 'auth.temporary_password.used',
+        resourceType: 'user',
+        resourceId: user.id,
+        ipHash,
+        requestId: context.requestId,
+      });
+
+      return json(
+        {
+          mustChangePassword: true,
+          resetToken: handover.token,
+          expiresAt: handover.expiresAt,
+          message:
+            'This is a temporary password. Please choose your own now — it takes a moment, and '
+            + 'you will be signed in straight afterwards.',
+        },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const tokens = await auth.issueTokens(user.id, user.email, {
       userAgent: context.request.headers.get('user-agent'),
       ipHash,
@@ -164,7 +284,28 @@ export async function logout(context: RequestContext): Promise<Response> {
 /** `GET /api/auth/me` — who the caller is and what they may do. */
 export async function me(context: RequestContext): Promise<Response> {
   if (!context.user) throw new UnauthorizedError('Please sign in to continue.');
-  return json(serializeUser(context.user), { headers: NO_STORE_HEADERS });
+
+  // Whether this account has completed its Okoli membership travels with the
+  // identity rather than needing a request of its own. Contributing requires
+  // it, so the question is asked on pages that have no other reason to know
+  // anything about membership, and asking it here costs one indexed lookup on
+  // a call the client already makes.
+  const profile = await context.env.DB.prepare(
+    'SELECT "handle", "membership_status", "membership_number" FROM "member_profiles" WHERE "user_id" = ? LIMIT 1',
+  )
+    .bind(context.user.id)
+    .first<{ handle: string; membership_status: string; membership_number: string }>();
+
+  return json(
+    {
+      ...serializeUser(context.user),
+      isMember: profile?.membership_status === 'active',
+      handle: profile?.handle ?? null,
+      membershipNumber: profile?.membership_number ?? null,
+      membershipStatus: profile?.membership_status ?? null,
+    },
+    { headers: NO_STORE_HEADERS },
+  );
 }
 
 /**
@@ -203,4 +344,32 @@ function serializeUser(user: {
     roles: user.roles,
     permissions: [...user.permissions],
   };
+}
+
+/**
+ * Whether a temporary password has outlived its window.
+ *
+ * Returns false when nothing was stamped, which covers accounts that were given
+ * a temporary password before this check existed. Locking those people out
+ * retroactively would punish them for a change they had no part in; they are
+ * still forced to choose a real password on the way in.
+ */
+async function temporaryPasswordExpired(
+  context: RequestContext,
+  issuedAt: string | null,
+): Promise<boolean> {
+  if (!issuedAt) return false;
+
+  const row = await context.env.DB
+    .prepare('SELECT "value" FROM "site_settings" WHERE "key" = ? LIMIT 1')
+    .bind('temp_password_ttl_hours')
+    .first<{ value: string | null }>();
+
+  const parsed = Number(row?.value ?? 72);
+  const hours = Number.isFinite(parsed) && parsed > 0 ? parsed : 72;
+
+  const issued = Date.parse(issuedAt);
+  if (Number.isNaN(issued)) return false;
+
+  return Date.now() - issued > hours * 3_600_000;
 }

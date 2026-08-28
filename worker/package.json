@@ -20,6 +20,10 @@
     "db:migrate:production": "wrangler d1 migrations apply ekoli-yeden-db --remote --env production",
     "db:list:local": "wrangler d1 migrations list ekoli-yeden-db --local",
     "db:studio": "wrangler d1 execute ekoli-yeden-db --local --command \"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;\"",
+    "admins": "node scripts/reset-password.mjs --list",
+    "admins:local": "node scripts/reset-password.mjs --list --local",
+    "password:reset": "node scripts/reset-password.mjs",
+    "password:reset:local": "node scripts/reset-password.mjs --local",
     "tail": "wrangler tail"
   },
   "devDependencies": {

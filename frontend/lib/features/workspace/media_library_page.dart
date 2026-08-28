@@ -16,6 +16,7 @@ import '../../core/widgets/state_views.dart';
 import '../../models/media_asset.dart';
 import '../../repositories/media_repository.dart';
 import '../../services/api/api_response.dart';
+import '../../services/api/mime_types.dart';
 import '../../services/auth/auth_controller.dart';
 import '../editorial/editorial_shell.dart';
 
@@ -174,15 +175,25 @@ class _MediaUploadPanelState extends State<MediaUploadPanel> {
   List<String> get _extensionsForFolder {
     switch (_folder) {
       case MediaFolders.audio:
+        return UploadExtensions.audio;
       case MediaFolders.language:
-        return <String>['mp3', 'm4a', 'aac', 'ogg', 'wav', 'weba'];
+        return <String>[
+          ...UploadExtensions.audio,
+          ...UploadExtensions.video,
+          ...UploadExtensions.images,
+          ...UploadExtensions.documents,
+        ];
       case MediaFolders.documents:
-        return <String>['pdf', 'doc', 'docx', 'txt'];
+        return UploadExtensions.documents;
       case MediaFolders.heritage:
       case MediaFolders.leboku:
-        return <String>['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'pdf', 'doc', 'docx', 'txt'];
+        return <String>[...UploadExtensions.gallery, ...UploadExtensions.documents];
+      case MediaFolders.avatars:
+        // Stills only. A moving profile picture is not something the archive
+        // needs, and this is the one folder every member can write to.
+        return UploadExtensions.images;
       default:
-        return <String>['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'];
+        return UploadExtensions.gallery;
     }
   }
 

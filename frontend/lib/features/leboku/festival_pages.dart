@@ -459,11 +459,43 @@ class _FestivalPage extends StatelessWidget {
                 : _ProgrammeTimeline(phases: detail.programme),
           ),
 
-          if (detail.gallery.isNotEmpty)
-            PageSection(
-              title: 'Photographs',
-              child: _FestivalGallery(items: detail.gallery),
+          // The album is shown even when it is empty. Every edition has one,
+          // and "photographs from this year go here, and there are none yet" is
+          // a more useful thing to say than nothing — it is the sentence that
+          // gets somebody to send in what they took.
+          PageSection(
+            title: 'Photographs',
+            action: detail.gallerySlug == null
+                ? null
+                : TextButton.icon(
+                    onPressed: () => context.go(AppRoutes.galleryAlbum(detail.gallerySlug!)),
+                    icon: const Icon(Icons.arrow_forward, size: 16),
+                    label: const Text('Open the album'),
+                    iconAlignment: IconAlignment.end,
+                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (detail.gallery.isEmpty)
+                  const AwaitingMaterialNote(
+                    message:
+                        'No photographs from this festival have been published yet. If you took '
+                        'any, they belong here — filed under this year, where they will still be '
+                        'findable in fifty years. They appear in the main Gallery as well.',
+                  )
+                else
+                  _FestivalGallery(items: detail.gallery),
+                const Gap.xl(),
+                OutlinedButton.icon(
+                  onPressed: () => context.go(
+                    AppRoutes.suggestCorrection('Photographs for', festival.displayName),
+                  ),
+                  icon: const Icon(Icons.upload_file_outlined, size: 18),
+                  label: Text('Send photographs from ${festival.displayName}'),
+                ),
+              ],
             ),
+          ),
 
           if (detail.videos.isNotEmpty)
             PageSection(

@@ -9,6 +9,8 @@ import { AuthService } from '../services/auth.service';
 import { PRESERVATION_TEAM, isPreservationPosition } from '../services/preservation-team.service';
 import { ROLES } from '../types/auth';
 import { hashPassword } from '../utils/crypto';
+import { nowIso } from '../utils/id';
+import { assertUsablePassword } from '../utils/password-quality';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../utils/errors';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, paginated, NO_STORE_HEADERS } from '../utils/responses';
@@ -94,9 +96,14 @@ export async function createUser(context: RequestContext): Promise<Response> {
   const validated = new Validator(body)
     .email('email', { required: true })
     .string('display_name', { required: true, min: 2, max: 120, label: 'Name' })
-    .string('password', { required: true, min: 12, max: 200, label: 'Password' })
+    .string('password', { required: true, min: 6, max: 200, label: 'Password' })
     .stringArray('roles', { maxItems: 10 })
     .validated();
+
+  assertUsablePassword(validated['password'] as string, {
+    email: validated['email'] as string,
+    displayName: validated['display_name'] as string,
+  });
 
   const position = typeof body['preservation_team_position'] === 'string'
     ? body['preservation_team_position']
@@ -301,11 +308,17 @@ export async function resetPassword(context: RequestContext): Promise<Response> 
   const id = context.params['id'] ?? '';
   const body = await readJsonBody(context.request);
   const validated = new Validator(body)
-    .string('password', { required: true, min: 12, max: 200, label: 'Password' })
+    .string('password', { required: true, min: 6, max: 200, label: 'Password' })
     .validated();
 
   const repository = new UserRepository(context.env.DB);
-  if (!(await repository.findById(id))) throw new NotFoundError('That user was not found.');
+  const target = await repository.findById(id);
+  if (!target) throw new NotFoundError('That user was not found.');
+
+  assertUsablePassword(validated['password'] as string, {
+    email: target.email,
+    displayName: target.display_name,
+  });
 
   const { hash, salt } = await hashPassword(validated['password'] as string);
   await repository.update(id, { password_hash: hash, password_salt: salt });
@@ -325,19 +338,121 @@ export async function resetPassword(context: RequestContext): Promise<Response> 
   return json({ id, passwordReset: true }, { headers: NO_STORE_HEADERS });
 }
 
+/**
+ * `POST /api/admin/users/:id/close`
+ *
+ * Closing somebody's account.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT A DELETE
+ * ---------------------------------------------------------------------------
+ *
+ * Deleting the row would take with it, or orphan, things that are not the
+ * account's to remove: the audit entries recording what was done and by whom,
+ * the attribution on every photograph and story they contributed, the
+ * authorship of history the community now relies on. An archive whose record of
+ * who supplied what can be erased by an administrator pressing a button is not
+ * an archive.
+ *
+ * So closing does everything a removal is actually wanted for, and keeps the
+ * record:
+ *
+ *   - the account can no longer sign in;
+ *   - every session it holds ends immediately;
+ *   - the profile leaves the directory and stops being findable in messages;
+ *   - the membership is marked as left.
+ *
+ * If somebody wants their personal data erased rather than their account
+ * closed, that is a privacy request under the policy — it is handled by a
+ * person, in the contact inbox, because it needs judgement about what belongs
+ * to them and what belongs to the community's history.
+ */
+export async function closeUserAccount(context: RequestContext): Promise<Response> {
+  const actor = requireActor(context);
+  const id = context.params['id'] ?? '';
+
+  const repository = new UserRepository(context.env.DB);
+  const target = await repository.findById(id);
+  if (!target) throw new NotFoundError('That user was not found.');
+
+  // Nobody closes their own account from the administration screen. It would
+  // sign them out mid-action and leave the community one administrator short
+  // by accident.
+  if (target.id === actor.id) {
+    throw new BadRequestError(
+      'You cannot close your own account here. Ask another administrator.',
+    );
+  }
+
+  // A Super Admin's account is not closable by a Deputy, for the same reason a
+  // Deputy cannot appoint one: the distinction has to hold in both directions.
+  const theirRoles = await repository.rolesForUser(target.id);
+  assertMayGovernSuperAdmin(
+    actor,
+    theirRoles.some((role) => role.slug === 'super_admin') ? 'super_admin' : 'other',
+    'remove',
+  );
+
+  const body = await readJsonBody(context.request).catch(() => ({}) as Record<string, unknown>);
+  const reason = new Validator(body).string('reason', { max: 1000 }).validated()['reason'] as
+    | string
+    | null;
+
+  await repository.update(id, { status: 'suspended' });
+  await repository.revokeAllSessionsForUser(id);
+
+  // Out of the directory and out of the messaging search. Somebody whose
+  // account is closed should not keep appearing to members as findable.
+  await context.env.DB
+    .prepare(
+      `UPDATE "member_profiles"
+       SET "membership_status" = 'left', "listed_in_directory" = 0,
+           "findable_for_messages" = 0, "messages_from" = 'nobody', "updated_at" = ?
+       WHERE "user_id" = ?`,
+    )
+    .bind(nowIso(), id)
+    .run();
+
+  await new AuditRepository(context.env.DB).record({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: 'user.closed',
+    resourceType: 'user',
+    resourceId: id,
+    changes: { email: target.email, reason: reason ?? null, sessionsRevoked: true },
+    requestId: context.requestId,
+  });
+
+  return json(
+    {
+      id,
+      message:
+        'The account is closed. They can no longer sign in, and they are out of the directory '
+        + 'and the messaging search. What they contributed to the archive is unchanged, and '
+        + 'their attribution stands.',
+    },
+    { headers: NO_STORE_HEADERS },
+  );
+}
+
 /** `POST /api/admin/account/password` — a signed-in user changing their own. */
 export async function changeOwnPassword(context: RequestContext): Promise<Response> {
   const actor = requireActor(context);
   const body = await readJsonBody(context.request);
   const validated = new Validator(body)
     .string('currentPassword', { required: true, min: 1, max: 200, label: 'Current password' })
-    .string('newPassword', { required: true, min: 12, max: 200, label: 'New password' })
+    .string('newPassword', { required: true, min: 6, max: 200, label: 'New password' })
     .validated();
 
   const auth = new AuthService(context.env);
   // Verifying the current password throws `UnauthorizedError` on a mismatch,
   // which is exactly the behaviour we want here.
   await auth.authenticate(actor.email, validated['currentPassword'] as string);
+
+  assertUsablePassword(validated['newPassword'] as string, {
+    email: actor.email,
+    displayName: actor.displayName,
+  });
 
   const repository = new UserRepository(context.env.DB);
   const { hash, salt } = await hashPassword(validated['newPassword'] as string);

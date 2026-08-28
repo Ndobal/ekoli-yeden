@@ -1,5 +1,6 @@
 import { MediaRepository } from '../repositories/media.repository';
 import { EditorialRepository } from '../repositories/editorial.repository';
+import { GalleryService } from './gallery.service';
 import { AuditRepository } from '../repositories/audit.repository';
 import type { Env } from '../types/env';
 import type { AuthenticatedUser } from '../types/auth';
@@ -8,9 +9,11 @@ import { BadRequestError, NotFoundError } from '../utils/errors';
 import { sha256 } from '../utils/crypto';
 import { newId, nowIso } from '../utils/id';
 import {
+  assertContentMatchesType,
   assertUploadAllowed,
   buildStorageKey,
   isR2Folder,
+  resolveMimeType,
   sanitizeFilename,
   type R2Folder,
 } from '../utils/files';
@@ -18,16 +21,24 @@ import {
 /**
  * CONTRIBUTOR UPLOADS
  *
- * Material sent in by the community, held apart from the published archive
+ * Material sent in by the community, held back from the published archive
  * until somebody has looked at it.
  *
- * The separation is a bucket, not a folder. Unreviewed material and the
- * archive have different audiences, different retention and different risk: a
- * bucket boundary means a mistake in the media-serving path cannot expose a
- * photograph nobody has checked, and the community can apply its own lifecycle
- * rules to submissions without touching the archive.
+ * WHAT ACTUALLY KEEPS IT PRIVATE
  *
- * On approval the object is COPIED into the archive bucket and a normal
+ * Not the bucket. The public media route resolves a storage key through the
+ * `media_assets` table and returns 404 when there is no row — and a contributed
+ * file has no row until it is approved. Guessing the key gets a visitor
+ * nowhere, whichever bucket the bytes are in.
+ *
+ * A separate bucket is still preferable, for reasons the media route does not
+ * cover: different retention, different lifecycle rules, and defence in depth
+ * against a future change to that route. So this writes to SUBMISSIONS when it
+ * is bound, and to MEDIA when it is not. Contributions working matters more
+ * than the boundary being ideal — a form that rejects every upload teaches the
+ * community that the archive does not want their photographs.
+ *
+ * On approval the object is copied into the archive bucket and a normal
  * media_assets record is created. The original stays where it is, so the chain
  * from "what was sent" to "what was published" is never broken — which matters
  * when the question later becomes "is this really the photograph she gave us?".
@@ -60,6 +71,34 @@ export class ContributionUploadService {
   }
 
   /**
+   * Where contributed files are written.
+   *
+   * The submissions bucket when one is bound, MEDIA when it is not. See the
+   * note on `Env.SUBMISSIONS` for why sharing a bucket is safe: privacy comes
+   * from the absence of a `media_assets` row, not from the bucket boundary,
+   * and `MediaService.serve` refuses any key it cannot resolve to one.
+   */
+  private get bucket(): R2Bucket {
+    return this.env.SUBMISSIONS ?? this.env.MEDIA;
+  }
+
+  /**
+   * Where contributed files are currently landing, in words.
+   *
+   * Surfaced by `/api/health/ready` so that "did the separate bucket ever get
+   * created?" is answerable without reading wrangler.jsonc.
+   */
+  get storageMode(): { separateBucket: boolean; detail: string } {
+    const separateBucket = this.env.SUBMISSIONS !== undefined;
+    return {
+      separateBucket,
+      detail: separateBucket
+        ? 'contributions land in the dedicated submissions bucket'
+        : 'contributions land in the archive bucket, unreadable until approved',
+    };
+  }
+
+  /**
    * Accepts a file from the public contribution form.
    *
    * No account is required. An elder's grandchild with a photograph on their
@@ -82,22 +121,31 @@ export class ContributionUploadService {
     }
     const folder: R2Folder = folderValue;
 
-    const mimeType = file.type || 'application/octet-stream';
     const filename = sanitizeFilename(file.name || 'contribution');
+    // Browsers frequently send nothing, or `application/octet-stream`, for a
+    // file picked on a phone. Falling back to the filename is what stops
+    // somebody's photograph being refused as an unknown binary — a particularly
+    // bad way to greet a first-time contributor.
+    const mimeType = resolveMimeType(file.type, filename);
 
     assertUploadAllowed({ folder, mimeType, sizeBytes: file.size, filename }, this.maxBytes);
     const bytes = await file.arrayBuffer();
     // Re-checked after reading: `File.size` is client-reported metadata.
     assertUploadAllowed({ folder, mimeType, sizeBytes: bytes.byteLength, filename }, this.maxBytes);
+    // And the bytes themselves, so a renamed executable is not stored as an image.
+    assertContentMatchesType(bytes, mimeType);
 
     const storageKey = buildStorageKey(folder, mimeType, filename);
 
-    await this.env.SUBMISSIONS.put(storageKey, bytes, {
+    await this.bucket.put(storageKey, bytes, {
       httpMetadata: { contentType: mimeType, cacheControl: 'private, no-store' },
       customMetadata: {
         originalFilename: filename,
         contributor: contributor?.id ?? 'anonymous',
         receivedAt: nowIso(),
+        // Marks the object as unreviewed for anybody browsing the bucket
+        // directly, which matters most while contributions share MEDIA.
+        review: 'pending',
       },
     });
 
@@ -176,7 +224,7 @@ export class ContributionUploadService {
     const record = await this.find(id);
     if (!record) throw new NotFoundError('That file was not found.');
 
-    const object = await this.env.SUBMISSIONS.get(record.storage_key);
+    const object = await this.bucket.get(record.storage_key);
     if (!object) throw new NotFoundError('That file was not found.');
 
     const headers = new Headers();
@@ -200,21 +248,36 @@ export class ContributionUploadService {
   async approve(
     id: string,
     reviewer: AuthenticatedUser,
-    options: { notes: string | null; requestId: string },
-  ): Promise<{ mediaAssetId: string }> {
+    options: {
+      notes: string | null;
+      requestId: string;
+      /** File it into this album in the same action. */
+      galleryId?: string | null;
+      /** Put it on the public site in the same action. */
+      publish?: boolean;
+    },
+  ): Promise<{ mediaAssetId: string; galleryItemId: string | null; published: boolean }> {
     const record = await this.find(id);
     if (!record) throw new NotFoundError('That file was not found.');
     if (record.status === 'promoted' && record.media_asset_id) {
-      return { mediaAssetId: record.media_asset_id };
+      // Already accessioned. Filing and publishing are still allowed, because
+      // the common way to arrive here is somebody approving a file, realising
+      // it never appeared anywhere, and coming back to finish the job.
+      return this.fileAndPublish(record.media_asset_id, options, reviewer);
     }
 
-    const object = await this.env.SUBMISSIONS.get(record.storage_key);
+    const object = await this.bucket.get(record.storage_key);
     if (!object) throw new NotFoundError('The contributed file is no longer in storage.');
 
-    const bytes = await object.arrayBuffer();
-
-    // Copied, not moved. The original stays so the provenance chain holds.
-    await this.env.MEDIA.put(record.storage_key, bytes, {
+    // Copied, not moved: the original stays where it was sent, so the chain
+    // from "what was given to us" to "what was published" is never broken.
+    //
+    // While the two share a bucket this is a rewrite in place rather than a
+    // copy — the bytes are identical either way, and what actually changes is
+    // the cache-control header, from `no-store` to public and immutable. The
+    // body is streamed rather than buffered so a 25 MB scan does not have to
+    // fit in the isolate twice.
+    await this.env.MEDIA.put(record.storage_key, object.body, {
       httpMetadata: {
         contentType: record.mime_type,
         cacheControl: 'public, max-age=31536000, immutable',
@@ -223,6 +286,7 @@ export class ContributionUploadService {
         originalFilename: record.original_filename,
         promotedFromSubmission: record.id,
         approvedBy: reviewer.id,
+        review: 'approved',
       },
     });
 
@@ -286,7 +350,80 @@ export class ContributionUploadService {
       requestId: options.requestId,
     });
 
-    return { mediaAssetId };
+    return this.fileAndPublish(mediaAssetId, options, reviewer, record);
+  }
+
+  /**
+   * Files an approved asset into an album, and optionally publishes it.
+   *
+   * WHY THIS EXISTS.
+   *
+   * Approving a contributed file created a media asset with status `approved`
+   * and stopped there. Nothing put it into an album, and nothing published it,
+   * so an approved photograph appeared in exactly one place: the media library,
+   * behind a login. Seven files were contributed to this archive and not one of
+   * them was visible to anybody — not on the gallery page, not at its own URL,
+   * because `MediaService.serve` refuses an unpublished asset to a visitor.
+   *
+   * Three separate steps, none of them signposted, and the work was lost
+   * between them. They are now one action with two optional halves.
+   *
+   * Approving still does not publish on its own. The reviewer asks for it, and
+   * the audit trail records that they did — the editorial principle was never
+   * the problem, the dead end was.
+   */
+  private async fileAndPublish(
+    mediaAssetId: string,
+    options: { galleryId?: string | null; publish?: boolean; requestId: string },
+    reviewer: AuthenticatedUser,
+    record?: { caption: string | null; contributor_name: string | null; taken_at: string | null; location: string | null },
+  ): Promise<{ mediaAssetId: string; galleryItemId: string | null; published: boolean }> {
+    const media = new MediaRepository(this.env.DB);
+    let galleryItemId: string | null = null;
+
+    if (options.galleryId) {
+      const gallery = new GalleryService(this.env);
+      const album = await gallery.repo.findBySlugOrId(options.galleryId);
+      if (!album) throw new NotFoundError('That album was not found.');
+
+      // Already in the album is a success, not a clash: a reviewer pressing the
+      // button twice should not be told off for it.
+      const existing = await gallery.repo.findItemByMedia(album.id, mediaAssetId);
+      galleryItemId =
+        existing?.id ??
+        (await gallery.repo.addItem({
+          galleryId: album.id,
+          mediaAssetId,
+          caption: record?.caption ?? null,
+          photographer: null,
+          peoplePictured: null,
+          takenAt: record?.taken_at ?? null,
+          location: record?.location ?? null,
+          sortOrder: await gallery.repo.nextSortOrder(album.id),
+          status: options.publish ? CONTENT_STATUS.PUBLISHED : CONTENT_STATUS.DRAFT,
+          addedBy: reviewer.id,
+        }));
+
+      if (options.publish && existing) {
+        await gallery.repo.updateItem(existing.id, { status: CONTENT_STATUS.PUBLISHED });
+      }
+    }
+
+    if (options.publish) {
+      await media.update(mediaAssetId, { status: CONTENT_STATUS.PUBLISHED });
+
+      await new AuditRepository(this.env.DB).record({
+        actorId: reviewer.id,
+        actorEmail: reviewer.email,
+        action: 'contribution.file.published',
+        resourceType: 'media_asset',
+        resourceId: mediaAssetId,
+        changes: { galleryId: options.galleryId ?? null, galleryItemId },
+        requestId: options.requestId,
+      });
+    }
+
+    return { mediaAssetId, galleryItemId, published: options.publish === true };
   }
 
   /** Rejects a contributed file. The file itself is kept, not deleted. */

@@ -61,6 +61,15 @@ export interface UserRecord {
   status: string;
   email_verified_at: string | null;
   last_login_at: string | null;
+
+  /// Set when an administrator has issued a temporary password. While it
+  /// stands, signing in yields no session — only the right to choose a real
+  /// password. See `issueTemporaryPassword`.
+  must_change_password: number;
+  password_changed_at: string | null;
+  temp_password_issued_by: string | null;
+  temp_password_issued_at: string | null;
+
   created_at: string;
   updated_at: string;
 }

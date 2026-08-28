@@ -38,6 +38,19 @@ dependencies:
     sdk: flutter
   file_picker: ^11.0.3
 
+  # MIME types for uploads. The file picker on web does not reliably report
+  # one, and multipart defaults to application/octet-stream — which the API
+  # refuses in every folder, so without this every upload is turned away.
+  http_parser: ^4.1.2
+
+  # Browser APIs, used for one thing: playing a pronunciation recording.
+  # Preserving the sound of the language is the point of the dictionary, and a
+  # link to an audio file that a visitor has to open in another tab is not the
+  # same as hearing an elder say the word. Reached only through
+  # `core/utils/audio/`, which conditionally imports it so that a non-web build
+  # and the test runner still compile.
+  web: ^1.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

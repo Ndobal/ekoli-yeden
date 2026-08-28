@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import 'core/config/app_config.dart';
 import 'core/config/cms_controller.dart';
 import 'core/config/service_locator.dart';
 import 'core/config/site_settings_controller.dart';
@@ -84,6 +85,32 @@ class _EkoliYedenAppState extends State<EkoliYedenApp> {
             themeMode: ThemeMode.light,
             routerConfig: _router,
             scrollBehavior: const _AppScrollBehavior(),
+            // EVERY PAGE IS SELECTABLE.
+            //
+            // Flutter Web paints text into a canvas, so by default none of it
+            // can be selected or copied — the browser sees pixels, not words.
+            // For most applications that is a papercut. For an archive it is a
+            // defect in the central promise: a person reading an elder's
+            // account, a dictionary entry or a festival programme has to be
+            // able to quote it, paste it into WhatsApp, or copy a name into a
+            // search. Material that cannot be copied is material that does not
+            // travel.
+            //
+            // Wrapping the router here rather than sprinkling `SelectableText`
+            // through a hundred widgets means it holds for every page written
+            // from now on, including ones nobody has thought of yet.
+            builder: (BuildContext context, Widget? child) => SelectionArea(
+              child: Column(
+                children: <Widget>[
+                  // A build that does not know where its API lives renders a
+                  // perfect-looking site on which nothing works. Saying so at
+                  // the top of every page is the only way that failure ever
+                  // looks like what it is.
+                  if (AppConfig.isPointedAtLocalhost) const _MisconfiguredBanner(),
+                  Expanded(child: child ?? const SizedBox.shrink()),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -105,4 +132,39 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
     PointerDeviceKind.trackpad,
     PointerDeviceKind.stylus,
   };
+}
+
+
+/// Shown when the bundle was built without `--dart-define=API_BASE_URL`.
+///
+/// Deliberately loud and deliberately unstyled by the theme: it is not part of
+/// the archive's design, it is a builder's error appearing on a visitor's
+/// screen, and it should look like one.
+class _MisconfiguredBanner extends StatelessWidget {
+  const _MisconfiguredBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Material(
+      color: Color(0xFF8B1A1A),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.error_outline, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  AppConfig.misconfigurationNotice,
+                  style: TextStyle(color: Colors.white, fontSize: 13, height: 1.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

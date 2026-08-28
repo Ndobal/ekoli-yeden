@@ -68,7 +68,8 @@ export class SubmissionService {
       );
     }
 
-    // A video contribution is a YouTube link, never an uploaded file.
+    // Either or both: a short clip arrives as an uploaded file in
+    // `media_asset_ids`, a long one as a link here.
     let youtubeUrl: string | null = null;
     if (payload['youtube_url'] !== undefined && payload['youtube_url'] !== null && payload['youtube_url'] !== '') {
       const urlCheck = new Validator({ youtube_url: payload['youtube_url'] }).url('youtube_url').validated();

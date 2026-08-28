@@ -13,11 +13,26 @@ sealed class AppException implements Exception {
   String toString() => '$runtimeType: $message${debugDetail == null ? '' : ' ($debugDetail)'}';
 }
 
-/// The device could not reach the Worker at all.
+/// The request never reached the Worker, or its answer was blocked.
+///
+/// THE MESSAGE HERE USED TO BLAME THE VISITOR'S CONNECTION.
+///
+/// A browser does not tell a page why a cross-origin request failed. A rejected
+/// origin, a blocked response and an unplugged cable are one indistinguishable
+/// event to Dart — so when the API's allow-list did not include the address
+/// people were actually visiting, everybody trying to register was told to
+/// check an internet connection that was working perfectly.
+///
+/// It cost real people real time, and it sent them looking in the one place the
+/// fault could not be. So the wording no longer asserts a cause it cannot know,
+/// and it names the address it was trying to reach — which is the single most
+/// useful thing somebody can pass on when reporting this.
 class NetworkException extends AppException {
   const NetworkException({super.debugDetail})
     : super(
-        'We could not reach the archive. Please check your internet connection and try again.',
+        'We could not reach the archive. This is usually a connection problem, but it can also '
+        'mean the address you are visiting is not one the archive recognises. Please try again, '
+        'and if it keeps happening tell us the address in your browser bar.',
       );
 }
 

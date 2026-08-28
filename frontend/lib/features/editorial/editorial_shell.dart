@@ -130,7 +130,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends StatefulWidget {
   const _Sidebar({
     required this.currentPath,
     required this.navigation,
@@ -146,9 +146,45 @@ class _Sidebar extends StatelessWidget {
   final bool closeOnTap;
 
   @override
+  State<_Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<_Sidebar> {
+  final TextEditingController _filter = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _filter.dispose();
+    super.dispose();
+  }
+
+  /// What the sidebar shows once something has been typed.
+  ///
+  /// Matches the label AND the description, because somebody looking for the
+  /// place to review a photograph will type "photograph" long before they
+  /// remember it is called "Contributed files".
+  List<NavItem> get _visible {
+    if (_query.isEmpty) return widget.navigation;
+    final String needle = _query.toLowerCase();
+    return widget.navigation
+        .where(
+          (NavItem item) =>
+              item.label.toLowerCase().contains(needle) ||
+              (item.description ?? '').toLowerCase().contains(needle),
+        )
+        .toList(growable: false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AuthController auth = context.watch<AuthController>();
+    final String workspaceName = widget.workspaceName;
+    final Color accent = widget.accent;
+    final String currentPath = widget.currentPath;
+    final bool closeOnTap = widget.closeOnTap;
+    final List<NavItem> navigation = _visible;
 
     return Container(
       color: AppColors.navyDark,
@@ -181,8 +217,74 @@ class _Sidebar extends StatelessWidget {
               ),
             ),
             Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
+
+            // A filter rather than a link list to scroll.
+            //
+            // The administration sidebar has grown past twenty entries, which
+            // is well past the point where finding one by eye is slower than
+            // typing three letters of it.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: TextField(
+                controller: _filter,
+                onChanged: (String value) => setState(() => _query = value.trim()),
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                cursorColor: Colors.white,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search this menu',
+                  hintStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 18,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.white.withValues(alpha: 0.55),
+                          ),
+                          onPressed: () {
+                            _filter.clear();
+                            setState(() => _query = '');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: const OutlineInputBorder(
+                    borderRadius: AppRadius.smAll,
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: const OutlineInputBorder(
+                    borderRadius: AppRadius.smAll,
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+
             Expanded(
-              child: ListView(
+              child: navigation.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Text(
+                        'Nothing in this menu matches “$_query”.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    )
+                  : ListView(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 children: navigation.map((NavItem item) {
                   final bool active = currentPath == item.path;
@@ -218,8 +320,8 @@ class _Sidebar extends StatelessWidget {
                       ),
                     ),
                   );
-                }).toList(growable: false),
-              ),
+                      }).toList(growable: false),
+                    ),
             ),
             Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
             Padding(

@@ -10,7 +10,6 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
-import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/content_card.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
@@ -27,41 +26,33 @@ import '../../services/api/api_response.dart';
 /// What this archive adds is organisation — categories, transcripts and a
 /// permanent link — which is the difference between a video existing and a
 /// video being findable in twenty years.
-class VideosListPage extends StatefulWidget {
-  const VideosListPage({super.key});
+/// THE VIDEO ARCHIVE, AS A BROWSABLE BLOCK.
+///
+/// Extracted from the page that used to hold it so the Gallery can show it in
+/// a tab. Photographs and film are the same question asked of the archive —
+/// "show me what this looked like" — and splitting them across two sections
+/// meant somebody looking for the festival found half of it.
+///
+/// The page at `/videos` still exists and still works: it renders the Gallery
+/// with this tab already open. A URL printed on a banner in 2026 has to keep
+/// resolving.
+class VideoBrowser extends StatefulWidget {
+  const VideoBrowser({super.key});
 
   @override
-  State<VideosListPage> createState() => _VideosListPageState();
+  State<VideoBrowser> createState() => _VideoBrowserState();
 }
 
-class _VideosListPageState extends State<VideosListPage> {
+class _VideoBrowserState extends State<VideoBrowser> {
   String? _category;
 
   @override
   Widget build(BuildContext context) {
     final VideoRepository repository = context.read<VideoRepository>();
 
-    return AppScaffold(
-      currentPath: AppRoutes.videos,
-      seo: const SeoMetadata(
-        title: 'Video Archive',
-        description:
-            'Documentaries, interviews, oral history, festival performances, cultural events and '
-            'music from Ekoli-Yeden, organised and preserved.',
-        canonicalPath: AppRoutes.videos,
-      ),
-      child: PageSection(
-        eyebrow: 'Video archive',
-        title: 'Videos',
-        description: context.cmsWatch(
-          'page.videos.intro',
-          fallback:
-              'Documentaries, interviews, oral history recordings, festival performances, '
-              'ceremonies and music. Videos are hosted on YouTube and organised here.',
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
@@ -104,8 +95,6 @@ class _VideosListPageState extends State<VideosListPage> {
               },
             ),
           ],
-        ),
-      ),
     );
   }
 }

@@ -233,10 +233,10 @@ class _RegisterPageState extends State<RegisterPage> {
               obscureText: true,
               decoration: const InputDecoration(
                 labelText: 'Password',
-                helperText: 'At least 12 characters. A short phrase works well.',
+                helperText: 'At least six characters. A short phrase works well, and common passwords are refused.',
               ),
-              validator: (String? value) => (value == null || value.length < 12)
-                  ? 'Please use at least 12 characters.'
+              validator: (String? value) => (value == null || value.length < 6)
+                  ? 'Please use at least six characters.'
                   : null,
             ),
             if (auth.errorMessage != null) ...<Widget>[
