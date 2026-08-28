@@ -493,11 +493,20 @@ never sent to the client.
 
 ## Status
 
-Every module is built. Modules 1 and 2 — the archive itself and its editorial
-workspace — are deployed; the community modules (membership, the forums,
-opportunities, the directory, family and birthdays, remembrance and the places
-of Ekori) are complete in the repository and go out with the migrations listed
-in [DEPLOY.md](DEPLOY.md).
+Every module is built, and every section of [vision.md](vision.md) with it.
+Modules 1 and 2 — the archive itself and its editorial workspace — are
+deployed; the community modules (membership, the forums, opportunities, the
+directory, family and birthdays, remembrance and the places of Ekori) are
+complete, as are the last seven sections of the proposal: Voices of Ekori
+(oral history), stories and folklore, the map, the children's learning area,
+the Hall of Fame, births and marriages, and the offer to mentor.
+
+Two of those carry deliberate refusals worth knowing about. **The map does not
+invent coordinates** — none of the fourteen recorded places has a position yet,
+and the archive lists them as unmarked rather than guessing, because a
+plausible pin looks exactly as authoritative as a surveyed one. **The
+children's area stores nothing** — quizzes are marked in the browser, and there
+is no attempts table, no score, and no endpoint that accepts an answer.
 
 The platform is finished and the archive is empty — which is the correct state
 for a community archive on its first day. Every section is ready to receive
