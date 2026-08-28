@@ -44,14 +44,18 @@ import '../../features/language/word_contribution_page.dart';
 import '../../features/leadership/leadership_pages.dart';
 import '../../features/leboku/festival_pages.dart';
 import '../../features/news/contribute_news_page.dart';
-import '../../features/news/news_pages.dart';
+import '../../features/news/news_article_page.dart';
+import '../../features/news/news_portal_page.dart';
 import '../../features/people/people_pages.dart';
+import '../../features/people/person_profile_page.dart';
 import '../../features/places/places_pages.dart';
 import '../../features/search/search_page.dart';
 import '../../features/videos/video_pages.dart';
 import '../../features/workspace/contributions_page.dart';
 import '../../features/workspace/festival_galleries_page.dart';
 import '../../features/workspace/media_library_page.dart';
+import '../../features/workspace/news_composer.dart';
+import '../../features/workspace/news_workspace.dart';
 import '../../features/workspace/contact_inbox_page.dart';
 import '../../features/workspace/community_snapshot_page.dart';
 import '../../features/workspace/review_queues.dart';
@@ -192,7 +196,7 @@ GoRouter buildRouter(AuthController auth) {
           GoRoute(
             path: ':slug',
             builder: (_, GoRouterState state) =>
-                PersonDetailPage(slug: state.pathParameters['slug']!),
+                PersonProfilePage(slug: state.pathParameters['slug']!),
           ),
         ],
       ),
@@ -313,14 +317,14 @@ GoRouter buildRouter(AuthController auth) {
       ),
       GoRoute(
         path: AppRoutes.news,
-        builder: (_, _) => const NewsListPage(),
+        builder: (_, _) => const NewsPortalPage(),
         routes: <RouteBase>[
           // Ahead of `:slug`, so `submit` is never read as a headline's slug.
           GoRoute(path: 'submit', builder: (_, _) => const ContributeNewsPage()),
           GoRoute(
             path: ':slug',
             builder: (_, GoRouterState state) =>
-                NewsDetailPage(slug: state.pathParameters['slug']!),
+                NewsArticlePage(slug: state.pathParameters['slug']!),
           ),
         ],
       ),
@@ -418,9 +422,12 @@ GoRouter buildRouter(AuthController auth) {
         ],
       ),
 
+      // Development projects are a tab of News now — a borehole being finished
+      // is news, and the project is what the news is about. The address keeps
+      // working and opens News with that tab showing.
       GoRoute(
         path: AppRoutes.community,
-        builder: (_, _) => const CommunityProjectsListPage(),
+        builder: (_, _) => const NewsPortalPage(initialTab: NewsTab.projects),
         routes: <RouteBase>[
           GoRoute(
             path: ':slug',
@@ -451,8 +458,9 @@ GoRouter buildRouter(AuthController auth) {
       ),
       GoRoute(path: AppRoutes.register, builder: (_, _) => const RegisterPage()),
 
-      // --- Yakoli membership ------------------------------------------------
-      // One Okoli account. `/account` is the account acting on itself;
+      // --- The user account -------------------------------------------------
+      // One account for the whole platform. `/account` is the account acting on
+      // itself;
       // `/directory/<handle>` is one member looking at another, which is why
       // they sit under different paths.
       GoRoute(path: AppRoutes.join, builder: (_, _) => const JoinPage()),
@@ -555,6 +563,25 @@ GoRouter buildRouter(AuthController auth) {
         path: AppRoutes.editorialFestivalGalleries,
         builder: (_, _) => const FestivalGalleriesPage(workspace: WorkspaceKind.editorial),
       ),
+      // The newsroom. `compose` before `:id`, so it is never read as a story id.
+      GoRoute(
+        path: AppRoutes.editorialNews,
+        builder: (_, _) => const NewsWorkspacePage(workspace: WorkspaceKind.editorial),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'compose',
+            builder: (_, _) => const NewsComposerPage(workspace: WorkspaceKind.editorial),
+          ),
+          GoRoute(
+            path: ':id',
+            builder: (_, GoRouterState state) => NewsComposerPage(
+              workspace: WorkspaceKind.editorial,
+              newsId: state.pathParameters['id'],
+            ),
+          ),
+        ],
+      ),
+
       GoRoute(
         path: AppRoutes.editorialWordSubmissions,
         builder: (_, _) => const WordSubmissionsPage(workspace: WorkspaceKind.editorial),

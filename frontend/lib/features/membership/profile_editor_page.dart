@@ -9,6 +9,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
+import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../models/member.dart';
@@ -104,6 +105,7 @@ class _EditorState extends State<_Editor> {
   late final TextEditingController _years;
 
   String? _connection;
+  String? _relationship;
   String? _professionId;
   String? _educationLevel;
   String? _employmentStatus;
@@ -141,6 +143,7 @@ class _EditorState extends State<_Editor> {
     _years = TextEditingController(text: p.yearsExperience?.toString() ?? '');
 
     _connection = p.connection;
+    _relationship = p.relationship;
     _professionId = p.professionId;
     _educationLevel = p.educationLevel;
     _employmentStatus = p.employmentStatus;
@@ -265,6 +268,7 @@ class _EditorState extends State<_Editor> {
               'place_text': _text(_placeText),
               'clan': _text(_clan),
               'connection': _connection,
+              'relationship': _relationship,
               'connection_note': _text(_connectionNote),
             });
           }),
@@ -289,11 +293,57 @@ class _EditorState extends State<_Editor> {
               ),
               const Gap.xl(),
               _WhereInEkori(place: _placeText, clan: _clan),
-              const Gap.lg(),
+              const Gap.xl(),
+
+              // THE PRIMARY IDENTITY QUESTION.
+              //
+              // What somebody IS to Ekoli-Yeden, asked separately from what
+              // they DO on the platform. The second is a role a Super Admin
+              // assigns; this is theirs to answer, and it grants nothing.
+              Builder(
+                builder: (BuildContext context) => Text(
+                  context.cmsWatch(
+                    'profile.relationship.question',
+                    fallback: 'What is your relationship to Ekoli-Yeden?',
+                  ),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              const Gap.md(),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: widget.options.relationships
+                    .map(
+                      (LabelledChoice choice) => ChoiceChip(
+                        label: Text(choice.label),
+                        selected: _relationship == choice.value,
+                        onSelected: (bool selected) => setState(
+                          () => _relationship = selected ? choice.value : null,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+              const Gap.sm(),
+              Builder(
+                builder: (BuildContext context) => Text(
+                  'This is how the community places you, and it is what the Indigene Directory '
+                  'lists by. It gives you no extra permission on the site — what you can do '
+                  'here is a separate thing.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+
+              const Gap.xl(),
               DropdownButtonFormField<String?>(
                 initialValue: _connection,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Your connection to Ekoli-Yeden'),
+                decoration: const InputDecoration(
+                  labelText: 'How, in more detail (optional)',
+                ),
                 items: <DropdownMenuItem<String?>>[
                   const DropdownMenuItem<String?>(value: null, child: Text('Not said')),
                   ...widget.options.connections.map(

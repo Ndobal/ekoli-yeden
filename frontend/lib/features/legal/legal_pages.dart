@@ -69,7 +69,7 @@ class TermsPage extends StatelessWidget {
           'You do not need an account to read the archive. Most of it is public on purpose — a '
               'community history behind a sign-in is a history the family abroad cannot show '
               'their children.',
-          'Three areas are members-only, and each for a stated reason: the member directory, '
+          'Three areas need an account, and each for a stated reason: the Indigene Directory, '
               'because it lists real people; the opportunities board, because it is matched to '
               'you and shows nothing useful otherwise; and two of the three forum spaces, '
               'because they may contain young people.',
@@ -214,7 +214,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           'We do not sell anything about you, to anybody, ever.',
           'There is no advertising here, and no advertising or analytics tracker.',
           'Your phone number and email are hidden unless you turn them on yourself.',
-          'You are not in the member directory unless you choose to be.',
+          'You are not in the Indigene Directory unless you choose to be.',
           'The platform never labels anybody unemployed, anywhere, to anyone.',
           'Your birth year is never shown to anybody but you.',
           'You can ask what we hold about you, and ask us to remove it, without an account.',
@@ -236,7 +236,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               'profile built from what you looked at.',
           'When you create an account: your name, your email address, and your password — kept '
               'only as a salted PBKDF2 hash, never in a form anybody could read.',
-          'When you become a Yakoli member: whatever you choose to fill in — where you are, what '
+          'When you fill in your profile: whatever you choose to give — where you are, what '
               'you do, your skills, your interests, where in Ekori you are from. All of it is '
               'optional, and each part has its own visibility setting.',
           'When you contribute: the material itself, your name if you gave one, and how to reach '

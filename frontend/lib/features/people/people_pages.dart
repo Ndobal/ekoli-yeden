@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../models/content_record.dart';
-import '../shared/content_detail_page.dart';
 import '../shared/content_list_page.dart';
 
 /// PEOPLE OF EKOLI-YEDEN.
@@ -33,6 +32,17 @@ class PeopleListPage extends StatelessWidget {
           'information has been confirmed. If you know somebody who belongs here, you can build '
           'their profile below.',
       maxColumns: 4,
+      // The button on this page builds a biography rather than opening the
+      // general contribution form. A person is not a title and a description,
+      // and sending somebody to a box marked "description" to record their
+      // grandmother is how a life becomes a sentence.
+      emptyAction: (
+        label: 'Add somebody to the archive',
+        icon: Icons.person_add_alt,
+        prompt: 'Know somebody who belongs here? Build their profile — you can fill in as much '
+            'as you know, add a photograph, and leave the rest for somebody else to finish.',
+        path: AppRoutes.contributePerson,
+      ),
       // Adding somebody goes to a profile builder rather than to the general
       // contribution form. This section holds structured records, and an
       // unstructured contribution to it gets taken apart by whoever reviews
@@ -46,30 +56,6 @@ class PeopleListPage extends StatelessWidget {
         if (profession != null && place.isNotEmpty) return '$profession · $place';
         return profession ?? (place.isEmpty ? null : place);
       },
-    );
-  }
-}
-
-class PersonDetailPage extends StatelessWidget {
-  const PersonDetailPage({required this.slug, super.key});
-
-  final String slug;
-
-  @override
-  Widget build(BuildContext context) {
-    return ContentDetailPage(
-      resource: 'people',
-      identifier: slug,
-      basePath: AppRoutes.people,
-      sectionTitle: 'People',
-      detailFields: <DetailField>[
-        const DetailField(label: 'Profession', key: 'profession'),
-        const DetailField(label: 'Category', key: 'category'),
-        const DetailField(label: 'City', key: 'city'),
-        const DetailField(label: 'Country', key: 'country'),
-        const DetailField(label: 'Achievements', key: 'achievements'),
-        const DetailField(label: 'Website', key: 'website_url'),
-      ],
     );
   }
 }

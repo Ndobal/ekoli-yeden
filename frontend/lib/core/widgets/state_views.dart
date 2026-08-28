@@ -48,6 +48,9 @@ class EmptyView extends StatelessWidget {
     this.icon = Icons.inventory_2_outlined,
     this.showContributeAction = true,
     this.onContribute,
+    this.contributeLabel,
+    this.contributeIcon,
+    this.contributePrompt,
     super.key,
   });
 
@@ -56,6 +59,20 @@ class EmptyView extends StatelessWidget {
   final IconData icon;
   final bool showContributeAction;
   final VoidCallback? onContribute;
+
+  /// What the button says, where "Contribute to the archive" is the wrong
+  /// promise.
+  ///
+  /// The People section is the case that made this necessary: its empty state
+  /// used to offer the general contribution form, which takes a title and a
+  /// description — and a person is not a title and a description. Sending
+  /// somebody there to record their grandmother produced a note in a media
+  /// queue instead of a biography.
+  final String? contributeLabel;
+  final IconData? contributeIcon;
+
+  /// The sentence above the button, where the standard prompt does not fit.
+  final String? contributePrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +110,7 @@ class EmptyView extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
               child: Text(
-                Placeholders.contributePrompt,
+                contributePrompt ?? Placeholders.contributePrompt,
                 style: theme.textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
@@ -101,8 +118,8 @@ class EmptyView extends StatelessWidget {
             const Gap.md(),
             FilledButton.icon(
               onPressed: onContribute ?? () => context.go(AppRoutes.contribute),
-              icon: const Icon(Icons.upload_file_outlined, size: 18),
-              label: const Text('Contribute to the archive'),
+              icon: Icon(contributeIcon ?? Icons.upload_file_outlined, size: 18),
+              label: Text(contributeLabel ?? 'Contribute to the archive'),
             ),
           ],
         ],

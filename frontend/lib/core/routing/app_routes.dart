@@ -98,8 +98,10 @@ class AppRoutes {
   static const String cookies = '/cookies';
   static const String search = '/search';
 
-  // --- Yakoli membership ----------------------------------------------------
-  // One Okoli account for the whole platform. The forums, the opportunities
+  // --- The user account -----------------------------------------------------
+  // One account for the whole platform. Registering IS joining — there is no
+  // separate contributor account.
+  // The forums, the opportunities
   // board and the directory all read the profile these pages maintain; none of
   // them has a sign-in of its own.
   static const String join = '/join';
@@ -172,6 +174,9 @@ class AppRoutes {
   static const String editorialLeboku = '/editorial/leboku';
   static const String editorialPeople = '/editorial/people';
   static const String editorialNews = '/editorial/news';
+
+  /// The composer, for a story that does not exist yet.
+  static const String editorialNewsCompose = '/editorial/news/compose';
   static const String editorialEvents = '/editorial/events';
   static const String editorialGallery = '/editorial/gallery';
   static const String editorialVideos = '/editorial/videos';
@@ -250,6 +255,9 @@ class AppRoutes {
 
   /// One opportunity — `/opportunities/teacher-at-ekori-secondary`.
   static String opportunity(String slug) => '$opportunities/$slug';
+
+  /// The composer, opened on an existing story.
+  static String editorialNewsEdit(String id) => '$editorialNews/$id';
 
   /// One place — `/places/ukekeya`.
   static String place(String slug) => '$places/$slug';
@@ -387,11 +395,15 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
     path: AppRoutes.gallery,
     description: 'Photographs and film from the archive',
   ),
-  NavItem(label: 'Community', path: AppRoutes.community, description: 'Projects and organizations'),
+  NavItem(
+    label: 'Community',
+    path: AppRoutes.community,
+    description: 'Development projects, inside the news section',
+  ),
   NavItem(
     label: 'Join',
     path: AppRoutes.join,
-    description: 'One Okoli account — forums, opportunities and the directory',
+    description: 'One account — registering makes you part of Ekoli-Yeden',
   ),
   NavItem(
     label: 'Messages',
@@ -430,7 +442,11 @@ const List<NavItem> editorialNavigation = <NavItem>[
   NavItem(label: 'Language', path: AppRoutes.editorialLanguage),
   NavItem(label: 'Leboku', path: AppRoutes.editorialLeboku),
   NavItem(label: 'People', path: AppRoutes.editorialPeople),
-  NavItem(label: 'News', path: AppRoutes.editorialNews),
+  NavItem(
+    label: 'News',
+    path: AppRoutes.editorialNews,
+    description: 'The newsroom — write, review, schedule and publish',
+  ),
   NavItem(label: 'Events', path: AppRoutes.editorialEvents),
   NavItem(label: 'Gallery', path: AppRoutes.editorialGallery),
   NavItem(label: 'Videos', path: AppRoutes.editorialVideos),
@@ -465,7 +481,6 @@ const Map<String, ({String resource, String title})> editorialContentScreens =
   AppRoutes.editorialLanguage: (resource: 'language', title: 'Language'),
   AppRoutes.editorialLeboku: (resource: 'festivals', title: 'Leboku'),
   AppRoutes.editorialPeople: (resource: 'people', title: 'People'),
-  AppRoutes.editorialNews: (resource: 'news', title: 'News'),
   AppRoutes.editorialEvents: (resource: 'events', title: 'Events'),
   AppRoutes.editorialGallery: (resource: 'galleries', title: 'Gallery'),
   AppRoutes.editorialVideos: (resource: 'videos', title: 'Videos'),

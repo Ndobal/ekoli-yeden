@@ -53,8 +53,15 @@ npx wrangler whoami        # should show the Ndovera account
 
 ## 2. Apply the pending migrations
 
-Nothing is pending. `0001`–`0030` are applied to production as of
-28 August 2026 — the API and the website were deployed from this commit.
+Three are pending: `0031`–`0033`.
+
+| | |
+|---|---|
+| `0031` | There is no contributor account. Every registered person is a user of Ekoli-Yeden with the dashboard and the ability to contribute — the old `contributor` role held no permissions and could not contribute. Existing accounts move to `okoli_member`, and any without a profile get one on their next sign-in. |
+| `0032` | News becomes a publication: categories, tags, per-photograph credits, YouTube attachments, sources, editorial reviews and revisions. Rebuilds the `news` table to add the `changes_requested` and `scheduled` states — with `defer_foreign_keys` on and the submission links captured and restored, verified against seeded data. |
+| `0033` | USER → relationship → role. `relationship` (indigene, resident, married in, friend, researcher, organisation) is added beside `connection` and backfilled from it; the directory becomes the Indigene Directory. |
+
+`0001`–`0030` were applied to production on 28 August 2026.
 
 To check, or after adding one:
 
@@ -153,6 +160,8 @@ curl -s $API/api/forums                # the three spaces, and who may enter eac
 curl -s $API/api/ancestry              # the people the archive remembers
 curl -s $API/api/places                # Ekori, its wards, and everything under them
 curl -s $API/api/contact/topics        # what the contact form offers
+curl -s $API/api/news-portal/overview  # the news front page in one request
+curl -s $API/api/news-portal/categories
 
 # Messaging is members only. All three must answer 401 without a token.
 curl -s -o /dev/null -w '%{http_code}
@@ -236,6 +245,19 @@ a session, the pages behind them offer membership instead of a list, and
 professions and locations is not something to leave standing open to whoever
 finds the URL. Joining is free and takes a minute, which is the point of the
 directory in the first place.
+
+---
+
+## Scheduled news needs the cron
+
+`wrangler.jsonc` now declares `"triggers": { "crons": ["*/10 * * * *"] }` at the
+top level and in both environments. `wrangler deploy` registers it. Without the
+trigger a story set to publish at eight on the fifteenth simply never appears —
+it is not readable before its time by design, and nothing else moves it.
+
+Confirm after deploying: **Cloudflare dashboard → Workers → ekoli-yeden-api →
+Settings → Triggers** should show the ten-minute cron. There is also a manual
+run at **Editorial → News → Publish due**, for the morning a cron is missed.
 
 ---
 

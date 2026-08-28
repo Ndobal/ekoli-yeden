@@ -5,6 +5,7 @@ import { handlePreflight, withCors } from './middleware/cors';
 import { toErrorResponse } from './middleware/error-handler';
 import { json } from './utils/responses';
 import { newId } from './utils/id';
+import { publishDueNews } from './controllers/news.controller';
 
 /**
  * EKOLI YEDEN DIGITAL HOME — API Worker
@@ -27,6 +28,28 @@ import { newId } from './utils/id';
 const router = buildRouter();
 
 export default {
+  /**
+   * SCHEDULED PUBLICATION.
+   *
+   * The Editorial Team can prepare a story today and say "publish it on the
+   * fifteenth at eight". Nothing scheduled is readable before then — the public
+   * queries require `status = 'published'` AND a publication time that has
+   * passed — so this handler is what actually makes it appear.
+   *
+   * Every ten minutes rather than every minute: news here is not a trading
+   * floor, ten minutes of imprecision on a community announcement costs
+   * nothing, and six times fewer invocations is six times less to go wrong.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      publishDueNews(env).catch(() => {
+        // A failed run is not worth throwing: the next one picks up exactly the
+        // same backlog, because "due" is computed from the stored time rather
+        // than from when this last ran.
+      }),
+    );
+  },
+
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // A request id ties an error the visitor sees to the line in the log that
     // explains it, without exposing anything about the failure itself.

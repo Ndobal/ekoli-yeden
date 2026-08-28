@@ -7,6 +7,7 @@ import { permissionForStatus } from '../services/permissions';
 import { hasPermission } from '../services/auth.service';
 import { ALL_CONTENT_STATUSES, type ContentStatus } from '../types/models';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
+import { publicMediaUrl } from '../utils/files';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, paginated, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
 
@@ -25,9 +26,10 @@ export function publicList(resource: ContentResource): Handler {
     const service = new ContentService(context.env.DB, resource);
     const query = service.buildQuery(context.query, false);
     const { items, total } = await service.list(query);
+    const withImages = await attachImages(context.env, resource, items);
 
     return paginated(
-      decorate(resource, items),
+      decorate(resource, withImages),
       query.page,
       query.perPage,
       total,
@@ -42,7 +44,8 @@ export function publicShow(resource: ContentResource): Handler {
     const service = new ContentService(context.env.DB, resource);
     const identifier = context.params['identifier'] ?? '';
     const record = await service.findOne(identifier, false);
-    return json(decorateOne(resource, record), { headers: publicCacheHeaders() });
+    const [withImage] = await attachImages(context.env, resource, [record]);
+    return json(decorateOne(resource, withImage ?? record), { headers: publicCacheHeaders() });
   };
 }
 
@@ -225,4 +228,71 @@ function decorate(resource: ContentResource, items: Record<string, unknown>[]): 
 
 function decorateOne(resource: ContentResource, item: Record<string, unknown>): Record<string, unknown> {
   return resource.key === 'videos' ? decorateVideo(item) : item;
+}
+
+/**
+ * Which column holds a record's picture.
+ *
+ * A person has a `photo_media_id`; everything else has a `cover_media_id`. The
+ * distinction is in the schema and worth keeping — a portrait and a cover
+ * photograph are different things — so it is resolved here rather than by
+ * renaming a column.
+ */
+function imageColumnFor(resource: ContentResource): string {
+  return resource.key === 'people' ? 'photo_media_id' : 'cover_media_id';
+}
+
+/**
+ * Turns the media ids on a page of records into URLs.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A SECOND QUERY RATHER THAN A JOIN
+ * ---------------------------------------------------------------------------
+ *
+ * The content repository is generated from the registry and serves fourteen
+ * resources from one query builder. Threading an optional join through it for
+ * the sake of one column would complicate every read in the archive.
+ *
+ * This is one extra statement per page — an `IN` over at most a page of ids —
+ * and it leaves the generic path exactly as simple as it was. If the archive
+ * ever grows a second thing that needs joining, that is the moment to reach
+ * into the builder, not now.
+ */
+async function attachImages(
+  env: { DB: D1Database; PUBLIC_MEDIA_BASE_URL: string },
+  resource: ContentResource,
+  items: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const column = imageColumnFor(resource);
+
+  const ids = items
+    .map((item) => item[column])
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  if (ids.length === 0) return items;
+
+  const unique = [...new Set(ids)];
+  const result = await env.DB
+    .prepare(
+      `SELECT "id", "storage_key", "alt_text" FROM "media_assets"
+       WHERE "id" IN (${unique.map(() => '?').join(', ')})`,
+    )
+    .bind(...unique)
+    .all<{ id: string; storage_key: string; alt_text: string | null }>();
+
+  const urls = new Map<string, { url: string; alt: string | null }>();
+  for (const row of result.results ?? []) {
+    urls.set(row.id, {
+      url: publicMediaUrl(env.PUBLIC_MEDIA_BASE_URL, row.storage_key),
+      alt: row.alt_text,
+    });
+  }
+
+  return items.map((item) => {
+    const id = item[column];
+    const found = typeof id === 'string' ? urls.get(id) : undefined;
+    return found === undefined
+      ? item
+      : { ...item, image_url: found.url, image_alt: found.alt };
+  });
 }

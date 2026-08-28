@@ -70,7 +70,15 @@ class AppRoles {
   static const String mediaManager = 'media_manager';
   static const String lebokuManager = 'leboku_manager';
   static const String moderator = 'moderator';
+
+  /// Every registered person. Registering is joining — there is no separate
+  /// contributor account, because contributing needs a member profile and the
+  /// old `contributor` role did not carry one.
+  static const String member = 'okoli_member';
+
+  /// Retired. Kept because the audit log references it.
   static const String contributor = 'contributor';
+
   static const String publicVisitor = 'public_visitor';
 
   static const Map<String, String> labels = <String, String>{
@@ -81,7 +89,8 @@ class AppRoles {
     mediaManager: 'Media Manager',
     lebokuManager: 'Leboku Manager',
     moderator: 'Moderator',
-    contributor: 'Contributor',
+    member: 'Member',
+    contributor: 'Contributor (retired)',
     publicVisitor: 'Public Visitor',
   };
 

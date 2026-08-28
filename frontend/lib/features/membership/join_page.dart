@@ -122,10 +122,12 @@ class _JoinBanner extends StatelessWidget {
               child: CmsText(
                 'page.join.intro',
                 fallback:
-                    'One account for the whole of Ekoli Yeden. Being a member means you can take '
-                    'part in the community forums, see opportunities meant for Ekoli-Yeden people, '
-                    'and be found by others who need what you can do — if you choose to be. You '
-                    'decide what appears on your profile, and nothing sensitive is shown by default.',
+                    'One account for the whole of Ekoli Yeden. Registering makes you a member — '
+                    'there is no second form and no separate contributor account. Being a member '
+                    'means you can send material to the archive, write to other members, take '
+                    'part in the forums, see opportunities meant for Ekoli-Yeden people, and be '
+                    'found by others who need what you can do — if you choose to be. You decide '
+                    'what appears on your profile, and nothing sensitive is shown by default.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.92),
                 ),

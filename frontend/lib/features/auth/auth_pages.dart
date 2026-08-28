@@ -122,7 +122,7 @@ class _SignInPageState extends State<SignInPage> {
             ),
             TextButton(
               onPressed: () => context.go(AppRoutes.register),
-              child: const Text('Create a contributor account'),
+              child: const Text('Create an account'),
             ),
             TextButton(
               onPressed: () => context.go(AppRoutes.home),

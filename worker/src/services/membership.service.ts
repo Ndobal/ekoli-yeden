@@ -131,6 +131,69 @@ export class MembershipService {
     };
   }
 
+  /**
+   * Makes sure this account has a membership, creating one if it does not.
+   *
+   * ---------------------------------------------------------------------------
+   * REGISTERING IS JOINING
+   * ---------------------------------------------------------------------------
+   *
+   * There is no separate contributor account. Everybody who registers is a
+   * member of Ekoli-Yeden: they get a profile, the member dashboard, and the
+   * permission to contribute — which the old `contributor` role did not
+   * actually carry, so an account named for contributing could not contribute.
+   *
+   * Idempotent, and cheap when there is nothing to do, because it is called
+   * from two places: at registration, and when a dashboard is opened. The
+   * second is what heals every account created before this change — including
+   * accounts an administrator made by hand — on their next visit, with a handle
+   * built from the name they already have rather than a generated one.
+   *
+   * Never throws for an account that already has a profile, and never
+   * downgrades an existing one.
+   */
+  async ensureMembership(
+    user: AuthenticatedUser,
+    context: { requestId: string },
+  ): Promise<void> {
+    const existing = await this.members.findByUserId(user.id);
+    if (existing) return;
+
+    // Membership being closed does not stop an account from existing — it
+    // stops new people joining. An account that is already here and has no
+    // profile is a gap to close, not a new arrival to turn away.
+    const status = (await this.settingEnabled('membership_requires_approval', false))
+      ? 'pending'
+      : 'active';
+
+    const fullName = user.displayName;
+    const handle = await this.uniqueHandle(fullName, user.id);
+
+    const profileId = await this.members.create({
+      userId: user.id,
+      membershipNumber: membershipNumber(),
+      handle,
+      fullName,
+      membershipStatus: status,
+    });
+
+    const role = await this.users.findRoleBySlug('okoli_member');
+    if (role) await this.users.assignRole(user.id, role.id, null);
+
+    const profile = await this.members.findByUserId(user.id);
+    await this.recalculateCompletion(profile);
+
+    await new AuditRepository(this.env.DB).record({
+      actorId: user.id,
+      actorEmail: user.email,
+      action: 'membership.created',
+      resourceType: 'member_profile',
+      resourceId: profileId,
+      changes: { handle, status, via: 'automatic' },
+      requestId: context.requestId,
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Reading
   // -------------------------------------------------------------------------

@@ -73,11 +73,15 @@ export class AuthService {
       status: 'active',
     });
 
-    // Everyone who registers starts as a Contributor: they may submit material
-    // for review and nothing more.
-    const contributorRole = await this.users.findRoleBySlug('contributor');
-    if (contributorRole) await this.users.assignRole(userId, contributorRole.id, null);
-
+    // No role is assigned here, and no `contributor` role exists to assign any
+    // more. Registering IS joining: the caller follows this with
+    // `MembershipService.ensureMembership`, which creates the profile and
+    // grants `okoli_member` — the role that actually carries the permission to
+    // contribute.
+    //
+    // Kept out of this method because creating a membership needs a handle, a
+    // membership number and an audit entry, and none of that belongs to
+    // authentication.
     return userId;
   }
 

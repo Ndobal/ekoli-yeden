@@ -56,7 +56,7 @@ class _AccountPageState extends State<AccountPage> {
       currentPath: AppRoutes.account,
       seo: const SeoMetadata(
         title: 'Your account',
-        description: 'Your Okoli account.',
+        description: 'Your Ekoli-Yeden account.',
         canonicalPath: AppRoutes.account,
         noIndex: true,
       ),
@@ -96,7 +96,7 @@ class _SignedOut extends StatelessWidget {
     return PageSection(
       eyebrow: 'Your account',
       title: 'Sign in',
-      description: 'Your Okoli account is the same one you use everywhere else on this site.',
+      description: 'The same account you use everywhere else on this site.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -107,7 +107,7 @@ class _SignedOut extends StatelessWidget {
           const Gap.md(),
           TextButton(
             onPressed: () => context.go(AppRoutes.join),
-            child: const Text('Or learn about Yakoli membership'),
+            child: const Text('Or read what an account gives you'),
           ),
         ],
       ),
@@ -124,7 +124,7 @@ class _NotAMemberYet extends StatelessWidget {
       eyebrow: 'Your account',
       title: 'You have an account, but not a membership',
       description:
-          'The two are separate on purpose. Your account is how you sign in; a Yakoli membership '
+          'Your account is how you sign in, and it is also your place in the community: '
           'is what opens the community forums, the opportunities board and the directory.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -757,7 +757,7 @@ class _PrivacySummary extends StatelessWidget {
         on: profile.profileVisibility == 'public',
         onText: 'Visible to anybody',
         offText: profile.profileVisibility == 'members'
-            ? 'Visible to Yakoli members only'
+            ? 'Visible to signed-in users only'
             : 'Visible only to you',
       ),
       (

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/config/service_locator.dart';
 import '../../core/theme/app_spacing.dart';
@@ -36,8 +37,24 @@ class ContentListPage extends StatefulWidget {
     this.maxColumns = 3,
     this.searchable = true,
     this.footer,
+    this.emptyAction,
+    this.bare = false,
     super.key,
   });
+
+  /// Renders the list without the page around it.
+  ///
+  /// Used where a section becomes a tab of another page rather than a page of
+  /// its own — the community projects inside News. The scaffold, the heading
+  /// and the SEO belong to the host in that case, and nesting a second one
+  /// would produce two headers and two footers.
+  final bool bare;
+
+  /// Replaces the empty state's "Contribute to the archive" button.
+  ///
+  /// A section whose contributions are structured needs to send people to its
+  /// own form. See `PeopleListPage`, where the button builds a biography.
+  final ({String label, IconData icon, String prompt, String path})? emptyAction;
 
   /// The API resource key, e.g. `history`.
   final String resource;
@@ -105,18 +122,7 @@ class _ContentListPageState extends State<ContentListPage> {
         ? widget.description
         : context.cmsWatch(widget.descriptionKey!, fallback: widget.description ?? '');
 
-    return AppScaffold(
-      currentPath: widget.basePath,
-      seo: SeoMetadata(
-        title: widget.title,
-        description: description,
-        canonicalPath: widget.basePath,
-      ),
-      child: PageSection(
-        eyebrow: widget.eyebrow,
-        title: widget.title,
-        description: description,
-        child: Column(
+    final Widget body = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (widget.searchable) ...<Widget>[
@@ -161,6 +167,12 @@ class _ContentListPageState extends State<ContentListPage> {
                             'This part of the archive is ready and waiting for verified material from the community.')
                         : 'Try a different search, or browse everything by clearing the search box.',
                     showContributeAction: _search.isEmpty,
+                    contributeLabel: widget.emptyAction?.label,
+                    contributeIcon: widget.emptyAction?.icon,
+                    contributePrompt: widget.emptyAction?.prompt,
+                    onContribute: widget.emptyAction == null
+                        ? null
+                        : () => context.go(widget.emptyAction!.path),
                   ),
                   ?widget.footer,
                 ],
@@ -197,7 +209,24 @@ class _ContentListPageState extends State<ContentListPage> {
               },
             ),
           ],
-        ),
+    );
+
+    // A tab of another page supplies its own scaffold and heading. Nesting a
+    // second one would give the visitor two headers and two footers.
+    if (widget.bare) return body;
+
+    return AppScaffold(
+      currentPath: widget.basePath,
+      seo: SeoMetadata(
+        title: widget.title,
+        description: description,
+        canonicalPath: widget.basePath,
+      ),
+      child: PageSection(
+        eyebrow: widget.eyebrow,
+        title: widget.title,
+        description: description,
+        child: body,
       ),
     );
   }

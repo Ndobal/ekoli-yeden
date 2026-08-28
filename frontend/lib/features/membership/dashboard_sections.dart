@@ -268,7 +268,7 @@ class MemberToolGrid extends StatelessWidget {
       // does not exist teaches people not to trust the dashboard.
       const _Tool(
         icon: Icons.contacts_outlined,
-        label: 'Member directory',
+        label: 'Indigene Directory',
         detail: 'Find members by what they do and where they are',
         path: AppRoutes.directory,
       ),

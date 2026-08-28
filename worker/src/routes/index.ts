@@ -15,6 +15,7 @@ import { ancestryRoutes } from './ancestry.routes';
 import { placeRoutes } from './places.routes';
 import { contactRoutes } from './contact.routes';
 import { messagingRoutes } from './messaging.routes';
+import { newsRoutes } from './news.routes';
 
 /**
  * The complete route table.
@@ -63,6 +64,9 @@ export function buildRouter(): Router {
   router.registerAll(placeRoutes);
   router.registerAll(contactRoutes);
   router.registerAll(messagingRoutes);
+  // Before the generated public routes: `/api/news-portal` must not be read as
+  // a content resource named "news-portal".
+  router.registerAll(newsRoutes);
   router.registerAll(publicRoutes);
 
   return router;
@@ -84,5 +88,6 @@ export const allRoutes: RouteDefinition[] = [
   ...placeRoutes,
   ...contactRoutes,
   ...messagingRoutes,
+  ...newsRoutes,
   ...publicRoutes,
 ];

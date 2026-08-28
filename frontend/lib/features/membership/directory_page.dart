@@ -9,6 +9,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
+import '../../core/widgets/cms_text.dart';
 import '../../core/widgets/page_shell.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../core/widgets/state_views.dart';
@@ -71,10 +72,10 @@ class _DirectoryPageState extends State<DirectoryPage> {
     return AppScaffold(
       currentPath: AppRoutes.directory,
       seo: const SeoMetadata(
-        title: 'Member directory',
+        title: 'Indigene Directory',
         description:
-            'The people of Ekoli-Yeden who have chosen to be findable — by profession, skill and '
-            'where they are.',
+            'People of Ekoli-Yeden who have chosen to be findable — at home and in the '
+            'diaspora.',
         canonicalPath: AppRoutes.directory,
         // Never offered to a search engine. A list of real people, with their
         // professions and where they live, is exactly the page that should not
@@ -83,11 +84,17 @@ class _DirectoryPageState extends State<DirectoryPage> {
         noIndex: true,
       ),
       child: PageSection(
-        eyebrow: 'Yakoli',
-        title: 'Member directory',
-        description:
-            'People of Ekoli-Yeden who chose to be listed. Search by what somebody does, or by '
-            'where they are — a teacher in Ekori, an engineer in Lagos, a nurse abroad.',
+        eyebrow: 'Ekoli-Yeden',
+        title: context.cmsWatch('page.directory.title', fallback: 'Indigene Directory'),
+        description: context.cmsWatch(
+          'page.directory.intro',
+          fallback:
+              'People of Ekoli-Yeden who have chosen to be findable — at home and in the '
+              'diaspora. Search by what somebody does, or by where they are: a teacher in '
+              'Ekori, an engineer in Lagos, a nurse abroad. Nobody appears here unless they '
+              'switched it on themselves, and no phone number or email is shown unless they '
+              'shared it.',
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -341,6 +348,21 @@ class _MemberCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    // What they are to Ekoli-Yeden, then where they are. The
+                    // first is the question the directory exists to answer —
+                    // it is how somebody scanning a list of names recognises
+                    // who is one of theirs.
+                    if (member.relationshipLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                        child: Text(
+                          member.relationshipLabel!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.greenDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     if (place != null)
                       Text(
                         place,
@@ -382,24 +404,25 @@ class _MembersOnly extends StatelessWidget {
     return AppScaffold(
       currentPath: AppRoutes.directory,
       seo: const SeoMetadata(
-        title: 'Member directory',
-        description: 'The Yakoli member directory is for members of the community.',
+        title: 'Indigene Directory',
+        description: 'The Indigene Directory is for registered users of Ekoli-Yeden.',
         noIndex: true,
       ),
       child: PageSection(
         reading: true,
-        eyebrow: 'Yakoli',
-        title: 'The directory is for members',
+        eyebrow: 'Ekoli-Yeden',
+        title: 'The directory is for registered users',
         description:
-            'It lists people of Ekoli-Yeden who chose to be findable — what they do, and where '
-            'they are. Because those are real people, it is not open to everybody who finds the '
-            'address.',
+            'It lists people of Ekoli-Yeden who chose to be findable — indigenes, residents, '
+            'friends of the community — with what they do and where they are. Because those '
+            'are real people, it is not open to everybody who finds the address.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Joining is free and takes a minute. Nothing about you appears here unless you '
-              'switch it on yourself.',
+              'Registering is free and takes a minute — and registering IS joining, there is '
+              'no second form. Nothing about you appears here unless you switch it on '
+              'yourself.',
               style: theme.textTheme.bodyMedium,
             ),
             const Gap.xl(),
@@ -407,7 +430,7 @@ class _MembersOnly extends StatelessWidget {
               children: <Widget>[
                 FilledButton(
                   onPressed: () => context.go(AppRoutes.join),
-                  child: const Text('Become a member'),
+                  child: const Text('Create an account'),
                 ),
                 const Gap.hLg(),
                 TextButton(

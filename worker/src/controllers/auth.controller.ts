@@ -1,5 +1,6 @@
 import type { RequestContext } from '../types/api';
 import { AuthService } from '../services/auth.service';
+import { MembershipService } from '../services/membership.service';
 import { PasswordResetService } from '../services/password-reset.service';
 import { UserRepository } from '../repositories/user.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
@@ -43,6 +44,23 @@ export async function register(context: RequestContext): Promise<Response> {
     displayName: validated['display_name'] as string,
   });
 
+  // Registering is joining. Every registered person is a member of
+  // Ekoli-Yeden and a contributor to its archive — there is no separate
+  // contributor account, and there was never a good reason for one: the old
+  // `contributor` role held no permissions and could not contribute, because
+  // contributing requires a member profile.
+  await new MembershipService(context.env).ensureMembership(
+    {
+      id: userId,
+      email: validated['email'] as string,
+      displayName: validated['display_name'] as string,
+      status: 'active',
+      roles: [],
+      permissions: new Set<string>(),
+    },
+    { requestId: context.requestId },
+  );
+
   const audit = new AuditRepository(context.env.DB);
   await audit.record({
     actorId: userId,
@@ -50,7 +68,7 @@ export async function register(context: RequestContext): Promise<Response> {
     action: AUDIT_ACTIONS.USER_CREATED,
     resourceType: 'user',
     resourceId: userId,
-    changes: { via: 'self-registration', role: 'contributor' },
+    changes: { via: 'self-registration', role: 'okoli_member' },
     requestId: context.requestId,
   });
 
@@ -91,11 +109,13 @@ export async function register(context: RequestContext): Promise<Response> {
         email: validated['email'] as string,
         displayName: validated['display_name'] as string,
         status: 'active',
-        roles: ['contributor'],
+        roles: ['okoli_member'],
         permissions: [],
         isMember: false,
       },
-      message: 'Welcome. Your account is ready — the next step is your membership.',
+      message:
+        'Welcome to Ekoli-Yeden. Your account and your membership are ready — fill in your '
+        + 'profile so the community can find you, and send in whatever you have for the archive.',
     },
     { status: 201, headers: NO_STORE_HEADERS },
   );

@@ -39,6 +39,8 @@ export interface MemberProfileRecord {
   is_diaspora: number;
   connection: string | null;
   connection_note: string | null;
+  /// Indigene, resident, friend, researcher, organisation. Never a permission.
+  relationship: string | null;
   profession_id: string | null;
   profession_other: string | null;
   industry: string | null;
@@ -216,6 +218,8 @@ export class MemberRepository {
     'city',
     'connection',
     'connection_note',
+    // What they are to Ekoli-Yeden. Grants nothing; see `membership.ts`.
+    'relationship',
     'profession_id',
     'profession_other',
     'industry',

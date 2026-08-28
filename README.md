@@ -203,6 +203,37 @@ writable through the routes its administrators use.
 
 ---
 
+## News
+
+The section is a small newspaper with an archive underneath it. A story carries
+a category, the date it *happened* (not the date it was written up), where, a
+body built from typed blocks, any number of photographs each with its own
+caption and its own credit, any number of YouTube videos, tags, and its sources.
+
+Three decisions worth knowing:
+
+**The body is structured blocks, not HTML.** The brief asked for a rich-text
+editor and for server-side sanitisation. The usual way to do both — take HTML
+and scrub it — is a denylist, and denylists lose. So a paragraph is
+`{type, text}`, a heading carries a level, a link is a range with an address.
+Validation is an allowlist over a shape. The Editorial Team never writes markup,
+and there is no path by which anything they paste becomes script.
+
+**Nothing scheduled is readable early.** The public queries require both
+`status = 'published'` and a publication time that has passed. A cron every ten
+minutes publishes what is due.
+
+**The contributor cannot be edited out.** Who sent a story in lives on the
+record, not in the article text, and the edit endpoint strips those fields from
+the payload before writing. An editor rewording a headline cannot take somebody's
+name off it, by accident or otherwise.
+
+Social media stays the distribution channel. This is the permanent record —
+which is why a story embeds the YouTube video the community already published
+rather than asking anybody to upload it again.
+
+---
+
 ## The dictionary
 
 A word is not a row. `language_words` holds the headword; four tables hold what
@@ -229,6 +260,34 @@ Accepting creates a **draft, unverified** entry — "this is worth having" and
 
 ---
 
+## Who somebody is, and what they may do
+
+Two independent facts about every person, deliberately kept apart:
+
+```
+USER
+ ├── relationship to Ekoli-Yeden   indigene · resident · married in · friend ·
+ │                                 researcher · organisation · other
+ └── platform role                 user · contributor · editorial · admin
+```
+
+They do not vary together. An indigene may be an ordinary user or the Super
+Admin; a researcher from a university may be a contributor; a friend of the
+community may run the media library. Folding them into one word — "member" —
+forced every such person to be described as something they were not.
+
+**The relationship grants nothing.** It is recorded, shown on a profile where
+the person chose to show it, and it is what the Indigene Directory lists by.
+Every permission decision reads `roles` and nothing else.
+
+**Registering is joining.** There is no separate contributor account. There used
+to be, and it could not contribute: the `contributor` role held no permissions,
+and contributing requires a profile it never created. Everybody who registers is
+a user of Ekoli-Yeden with the dashboard, the ability to send material to the
+archive, and whatever role a Super Admin later assigns on top.
+
+---
+
 ## The community, and the platform it runs on
 
 The archive is one half of this. The other is the community using it, and those
@@ -244,6 +303,7 @@ have no sign-in of their own.
 | **Family and birthdays** | Who is related to whom, confirmed by both people, and the wishes a member has been sent. |
 | **Remembrance** | Nobody is removed when they die. Their account is stilled, what they made public stays public, and they are remembered in the Ancestry Records. |
 | **Messages** | Write to anybody in the community. Search a name, press send. |
+| **News** | A publication, not a noticeboard — announcements, a featured story, photographs, film, sources and a submission path for members. |
 | **The places of Ekori** | Ajere, Ntan, Epenti, Afrekpe — and everything inside them. |
 
 The directory is the one part of this that requires a session. It lists real

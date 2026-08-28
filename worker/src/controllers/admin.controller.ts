@@ -6,6 +6,7 @@ import { SubmissionRepository } from '../repositories/submission.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
 import { countByStatus } from '../repositories/base.repository';
 import { AuthService } from '../services/auth.service';
+import { MembershipService } from '../services/membership.service';
 import { PRESERVATION_TEAM, isPreservationPosition } from '../services/preservation-team.service';
 import { ROLES } from '../types/auth';
 import { hashPassword } from '../utils/crypto';
@@ -127,6 +128,21 @@ export async function createUser(context: RequestContext): Promise<Response> {
     status: 'active',
     preservation_team_position: position,
   });
+
+  // An account created here is a member like any other. Roles the administrator
+  // chose are added on top of that, not instead of it — an editor is a member
+  // of the community who also edits.
+  await new MembershipService(context.env).ensureMembership(
+    {
+      id: userId,
+      email,
+      displayName: validated['display_name'] as string,
+      status: 'active',
+      roles: [],
+      permissions: new Set<string>(),
+    },
+    { requestId: context.requestId },
+  );
 
   const requestedRoles: string[] = JSON.parse((validated['roles'] as string | undefined) ?? '[]');
   const assigned: string[] = [];

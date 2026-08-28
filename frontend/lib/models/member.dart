@@ -36,6 +36,8 @@ class MemberProfile {
     this.isDiaspora = false,
     this.connection,
     this.connectionNote,
+    this.relationship,
+    this.relationshipLabel,
     this.professionId,
     this.profession,
     this.professionOther,
@@ -93,6 +95,8 @@ class MemberProfile {
       isDiaspora: Json.boolVal(json, 'is_diaspora'),
       connection: Json.strOrNull(json, 'connection'),
       connectionNote: Json.strOrNull(json, 'connection_note'),
+      relationship: Json.strOrNull(json, 'relationship'),
+      relationshipLabel: Json.strOrNull(json, 'relationship_label'),
       professionId: Json.strOrNull(json, 'profession_id'),
       profession: Json.strOrNull(json, 'profession'),
       professionOther: Json.strOrNull(json, 'profession_other'),
@@ -168,6 +172,19 @@ class MemberProfile {
 
   final String? connection;
   final String? connectionNote;
+
+  /// WHAT THEY ARE TO EKOLI-YEDEN — indigene, resident, friend, researcher,
+  /// organisation.
+  ///
+  /// Not a role and never consulted for permission. A person has two
+  /// independent facts about them: what they are to Ekoli-Yeden, and what they
+  /// do on this platform. An indigene may be an ordinary user or the Super
+  /// Admin, and a researcher may be a contributor — folding the two into one
+  /// word forces somebody to be described as what they are not.
+  final String? relationship;
+
+  /// The server's own wording for it, so the label lives in one place.
+  final String? relationshipLabel;
 
   final String? professionId;
 
@@ -390,6 +407,7 @@ class MembershipOptions {
     required this.interests,
     required this.employmentStatuses,
     required this.connections,
+    this.relationships = const <LabelledChoice>[],
     required this.educationLevels,
     required this.visibilities,
     required this.privacyPromise,
@@ -407,6 +425,7 @@ class MembershipOptions {
           Json.objectList(json, 'interests').map(MemberInterest.fromJson).toList(growable: false),
       employmentStatuses: choices('employmentStatuses'),
       connections: choices('connections'),
+      relationships: choices('relationships'),
       educationLevels: choices('educationLevels'),
       visibilities: choices('visibilities'),
       privacyPromise: Json.stringList(json, 'privacyPromise'),
@@ -418,6 +437,10 @@ class MembershipOptions {
   final List<MemberInterest> interests;
   final List<LabelledChoice> employmentStatuses;
   final List<LabelledChoice> connections;
+
+  /// What somebody is to Ekoli-Yeden. The primary identity question, asked
+  /// separately from the platform role a Super Admin assigns.
+  final List<LabelledChoice> relationships;
   final List<LabelledChoice> educationLevels;
   final List<LabelledChoice> visibilities;
 

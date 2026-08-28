@@ -156,7 +156,7 @@ class _Tiles extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<({String label, int value, String note})> tiles =
         <({String label, int value, String note})>[
-          (label: 'Members', value: snapshot.total, note: 'Okoli accounts with a membership'),
+          (label: 'People', value: snapshot.total, note: 'Registered users of Ekoli-Yeden'),
           (
             label: 'In Ekoli-Yeden',
             value: snapshot.inEkoliYeden,

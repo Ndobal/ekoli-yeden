@@ -20,6 +20,20 @@
     "head_sampling_rate": 1
   },
 
+  // SCHEDULED PUBLICATION.
+  //
+  // The Editorial Team can prepare a story and set it to go out at a chosen
+  // moment. Nothing scheduled is readable before then — the public queries
+  // require both `status = 'published'` and a publication time that has passed
+  // — so this cron is what actually makes it appear.
+  //
+  // Every ten minutes rather than every minute: news here is not a trading
+  // floor, ten minutes of imprecision on a community announcement costs
+  // nothing, and it is six times fewer invocations to go wrong.
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+
   // Non-secret configuration only. Secrets live in `wrangler secret put`
   // (remote) or `.dev.vars` (local, git-ignored). See docs/architecture.md.
   "vars": {
@@ -83,6 +97,9 @@
   "env": {
     "staging": {
       "name": "ekoli-yeden-api-staging",
+      "triggers": {
+        "crons": ["*/10 * * * *"]
+      },
       "vars": {
         "ENVIRONMENT": "staging",
         "API_VERSION": "1.0.0",
@@ -111,6 +128,9 @@
 
     "production": {
       "name": "ekoli-yeden-api",
+      "triggers": {
+        "crons": ["*/10 * * * *"]
+      },
       "vars": {
         "ENVIRONMENT": "production",
         "API_VERSION": "1.0.0",

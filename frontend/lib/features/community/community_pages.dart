@@ -6,4 +6,4 @@
 library;
 
 export '../businesses/directory_pages.dart'
-    show CommunityProjectsListPage, CommunityProjectDetailPage;
+    show CommunityProjectsListPage, CommunityProjectDetailPage, CommunityProjectsBrowser;

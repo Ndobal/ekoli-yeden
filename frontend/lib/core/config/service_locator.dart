@@ -18,6 +18,7 @@ import '../../repositories/language_repository.dart';
 import '../../repositories/media_repository.dart';
 import '../../repositories/member_repository.dart';
 import '../../repositories/message_repository.dart';
+import '../../repositories/news_portal_repository.dart';
 import '../../repositories/news_repository.dart';
 import '../../repositories/opportunity_repository.dart';
 import '../../repositories/people_repository.dart';
@@ -65,6 +66,7 @@ class ServiceLocator {
       Provider<EventRepository>(create: (_) => EventRepository(api)),
       Provider<ForumRepository>(create: (_) => ForumRepository(api)),
       Provider<NewsRepository>(create: (_) => NewsRepository(api)),
+      Provider<NewsPortalRepository>(create: (_) => NewsPortalRepository(api)),
       Provider<OpportunityRepository>(create: (_) => OpportunityRepository(api)),
       Provider<KinshipRepository>(create: (_) => KinshipRepository(api)),
       Provider<RemembranceRepository>(create: (_) => RemembranceRepository(api)),

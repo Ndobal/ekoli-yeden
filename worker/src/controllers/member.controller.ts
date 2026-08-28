@@ -5,6 +5,8 @@ import { NotificationRepository } from '../repositories/notification.repository'
 import {
   CONNECTIONS,
   CONNECTION_LABELS,
+  EKOLI_RELATIONSHIPS,
+  EKOLI_RELATIONSHIP_LABELS,
   EDUCATION_LABELS,
   EDUCATION_LEVELS,
   EMPLOYMENT_LABELS,
@@ -69,6 +71,13 @@ export async function membershipOptions(context: RequestContext): Promise<Respon
         group: workGroupFor(value),
       })),
       workGroups: Object.entries(WORK_GROUP_LABELS).map(([value, label]) => ({ value, label })),
+      // The two axes, offered separately: what somebody IS to Ekoli-Yeden, and
+      // the longer list of ways of saying it that profiles filled in before
+      // 0033 still carry.
+      relationships: EKOLI_RELATIONSHIPS.map((value) => ({
+        value,
+        label: EKOLI_RELATIONSHIP_LABELS[value],
+      })),
       connections: CONNECTIONS.map((value) => ({ value, label: CONNECTION_LABELS[value] })),
       educationLevels: EDUCATION_LEVELS.map((value) => ({ value, label: EDUCATION_LABELS[value] })),
       proficiencies: PROFICIENCIES,
@@ -135,6 +144,7 @@ export async function joinCommunity(context: RequestContext): Promise<Response> 
 export async function myProfile(context: RequestContext): Promise<Response> {
   const actor = requireActor(context);
   const service = new MembershipService(context.env);
+  await service.ensureMembership(actor, { requestId: context.requestId });
   return json(await service.readOwnProfile(actor), { headers: NO_STORE_HEADERS });
 }
 
@@ -142,6 +152,13 @@ export async function myProfile(context: RequestContext): Promise<Response> {
 export async function memberDashboard(context: RequestContext): Promise<Response> {
   const actor = requireActor(context);
   const service = new MembershipService(context.env);
+
+  // Every registered person is a member. An account made before that was true —
+  // or created by an administrator, which does not go through registration —
+  // gets its profile here, on the first dashboard it opens, using the name it
+  // already has. Cheap and idempotent when there is nothing to do.
+  await service.ensureMembership(actor, { requestId: context.requestId });
+
   return json(await service.dashboard(actor), { headers: NO_STORE_HEADERS });
 }
 
@@ -183,6 +200,11 @@ export async function updateMyProfile(context: RequestContext): Promise<Response
     .string('institution', { max: 200, label: 'Institution' });
 
   if ('connection' in body && body['connection']) validator.oneOf('connection', CONNECTIONS);
+  // WHAT THEY ARE TO EKOLI-YEDEN. Recorded, never consulted for permission —
+  // see the note above `EKOLI_RELATIONSHIPS`.
+  if ('relationship' in body && body['relationship']) {
+    validator.oneOf('relationship', EKOLI_RELATIONSHIPS);
+  }
   if ('education_level' in body && body['education_level']) {
     validator.oneOf('education_level', EDUCATION_LEVELS);
   }

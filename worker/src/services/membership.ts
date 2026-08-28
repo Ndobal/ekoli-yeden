@@ -83,7 +83,62 @@ export function workGroupFor(status: string | null | undefined): WorkGroup {
   return WORK_GROUPS[status as EmploymentStatus] ?? 'unknown';
 }
 
-/** How somebody belongs to Ekoli-Yeden. */
+/**
+ * WHAT SOMEBODY IS TO EKOLI-YEDEN.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS IS NOT A ROLE, AND THE TWO MUST NOT BE MERGED
+ * ---------------------------------------------------------------------------
+ *
+ * A person on this platform has two independent facts about them:
+ *
+ *   what they ARE to Ekoli-Yeden   — indigene, resident, friend, researcher
+ *   what they DO on the platform   — user, contributor, editorial, admin
+ *
+ * They do not vary together. An indigene may be an ordinary user or the Super
+ * Admin; a researcher from a university may be a contributor; a friend of the
+ * community may run the media library. Folding them into one word forces every
+ * such person to be described as something they are not.
+ *
+ * So this grants nothing. It is recorded, it is shown on a profile where the
+ * person chose to show it, and it is what the Indigene Directory filters by.
+ * Every permission decision reads `roles` and nothing here.
+ *
+ * `married_in` is the seventh where six were suggested. The community already
+ * makes that distinction, and collapsing it into either "indigene" or
+ * "resident" would have the archive decide which a woman who married into
+ * Ekori is. That is not the platform's decision to make.
+ */
+export const EKOLI_RELATIONSHIPS = [
+  'indigene',
+  'resident',
+  'married_in',
+  'friend',
+  'researcher',
+  'organisation',
+  'other',
+] as const;
+
+export type EkoliRelationship = (typeof EKOLI_RELATIONSHIPS)[number];
+
+export const EKOLI_RELATIONSHIP_LABELS: Record<string, string> = {
+  indigene: 'Indigene of Ekoli-Yeden',
+  resident: 'Resident of Ekoli-Yeden',
+  married_in: 'Married into Ekoli-Yeden',
+  friend: 'Friend and supporter',
+  researcher: 'Researcher or academic',
+  organisation: 'Organisation or institution',
+  other: 'Something else',
+};
+
+/**
+ * The older, longer list.
+ *
+ * Kept because `connection` still holds these values on profiles filled in
+ * before 0033, and because the distinctions in it — born here, family from
+ * here, returned — are a story worth keeping even now that the relationship
+ * field says "indigene" for all three.
+ */
 export const CONNECTIONS = [
   'born_here',
   'family_from_here',
@@ -196,6 +251,14 @@ export function visibleProfile(
     avatar_url: profile['avatar_url'] ?? null,
     connection: profile['connection'],
     connection_note: profile['connection_note'],
+    // Shown to anybody who may see the profile at all. What somebody is to
+    // Ekoli-Yeden is the least private thing about them and the reason most
+    // people are here — it is not hidden behind the contact switches.
+    relationship: profile['relationship'],
+    relationship_label:
+      typeof profile['relationship'] === 'string'
+        ? (EKOLI_RELATIONSHIP_LABELS[profile['relationship']] ?? null)
+        : null,
     profession_id: profile['profession_id'],
     profession: profile['profession'] ?? null,
     profession_other: profile['profession_other'],

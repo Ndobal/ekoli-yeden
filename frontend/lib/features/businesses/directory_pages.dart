@@ -148,6 +148,39 @@ class CommunityProjectsListPage extends StatelessWidget {
   }
 }
 
+/// The community projects, without a page around them.
+///
+/// Development projects moved into the News section as a tab: a borehole being
+/// finished is news, and the project is what the news is about. Keeping them
+/// apart meant somebody reading about an opening had nowhere to find out what
+/// the project was, and the projects section sat unvisited.
+///
+/// `/community` still resolves — printed addresses have to keep working — and
+/// opens News with this tab showing.
+class CommunityProjectsBrowser extends StatelessWidget {
+  const CommunityProjectsBrowser({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ContentListPage(
+      bare: true,
+      resource: 'community',
+      basePath: AppRoutes.community,
+      title: 'Community Projects',
+      emptyTitle: 'No projects published yet',
+      emptyMessage:
+          'Development projects will be listed here with their purpose, committee and progress '
+          'once the information has been supplied.',
+      metaBuilder: (ContentRecord record) {
+        final String? state = record.text('project_status');
+        final int? progress = record.number('progress_percent');
+        if (state != null && progress != null) return '$state · $progress% complete';
+        return state;
+      },
+    );
+  }
+}
+
 class CommunityProjectDetailPage extends StatelessWidget {
   const CommunityProjectDetailPage({required this.slug, super.key});
 
