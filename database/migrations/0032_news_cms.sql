@@ -28,16 +28,23 @@
 --
 -- Two workflow states are missing — `changes_requested` and `scheduled` — and
 -- they live in a CHECK constraint, which SQLite cannot alter in place. So the
--- table is rebuilt by the standard procedure, with `defer_foreign_keys` on so
--- that `news_submissions.news_id` is not set to NULL while the table is gone.
+-- table is rebuilt by the standard procedure.
 --
--- The mapping is also captured into a temporary table and restored afterwards,
--- belt and braces: the link between a member's submission and the article it
--- became is the contributor's acknowledgement, and losing it silently would be
--- the worst possible outcome of a schema change.
+-- ---------------------------------------------------------------------------
+-- AND THE SUBMISSION LINKS ARE CARRIED ACROSS BY HAND
+-- ---------------------------------------------------------------------------
+--
+-- `DROP TABLE` runs an implicit delete, which fires `ON DELETE SET NULL` on
+-- `news_submissions.news_id` — so the link between a member's submission and
+-- the article it became would quietly become NULL. That link is the
+-- contributor's acknowledgement, and losing it silently is the worst thing a
+-- schema change could do here.
+--
+-- The usual answer is `PRAGMA defer_foreign_keys`, and D1 refuses PRAGMA over
+-- its API (`SQLITE_AUTH`). So the mapping is copied into an ordinary table
+-- first — not a TEMPORARY one, which D1 also refuses — and written back after
+-- the rename. Explicit, and it works on any SQLite.
 -- ===========================================================================
-
-PRAGMA defer_foreign_keys = on;
 
 -- ---------------------------------------------------------------------------
 -- Categories, managed by the Editorial Team rather than by a deployment.
@@ -241,8 +248,11 @@ CREATE INDEX IF NOT EXISTS idx_news_revisions_news
 -- THE REBUILD
 -- ===========================================================================
 
--- The submission-to-article links, held aside.
-CREATE TEMPORARY TABLE _news_submission_links AS
+-- The submission-to-article links, held aside. An ordinary table, dropped at
+-- the end of this migration: D1 does not allow TEMPORARY ones.
+DROP TABLE IF EXISTS _news_submission_links;
+
+CREATE TABLE _news_submission_links AS
   SELECT id AS submission_id, news_id FROM news_submissions WHERE news_id IS NOT NULL;
 
 CREATE TABLE news_rebuilt (

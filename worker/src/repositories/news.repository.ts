@@ -75,7 +75,15 @@ export class NewsRepository {
     }
 
     const where = conditions.join(' AND ');
-    const from = `FROM "news" n LEFT JOIN "news_categories" c ON c."id" = n."category_id" WHERE ${where}`;
+
+    // The media join belongs in `from` and not only in the SELECT: both
+    // statements below share this fragment, and the cover columns are read
+    // from `ma`.
+    const from =
+      `FROM "news" n
+       LEFT JOIN "news_categories" c ON c."id" = n."category_id"
+       LEFT JOIN "media_assets" ma ON ma."id" = n."cover_media_id"
+       WHERE ${where}`;
 
     const [countRow, rows] = await this.db.batch<Record<string, unknown>>([
       this.db.prepare(`SELECT COUNT(*) AS total ${from}`).bind(...bindings),
@@ -198,7 +206,11 @@ export class NewsRepository {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const from = `FROM "news" n LEFT JOIN "news_categories" c ON c."id" = n."category_id" ${where}`;
+    const from =
+      `FROM "news" n
+       LEFT JOIN "news_categories" c ON c."id" = n."category_id"
+       LEFT JOIN "media_assets" ma ON ma."id" = n."cover_media_id"
+       ${where}`;
 
     const [countRow, rows] = await this.db.batch<Record<string, unknown>>([
       this.db.prepare(`SELECT COUNT(*) AS total ${from}`).bind(...bindings),
