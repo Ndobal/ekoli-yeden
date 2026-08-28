@@ -20,7 +20,7 @@ class AuthService {
     );
 
     await _saveSession(data);
-    return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
+    return _resolveUser(data);
   }
 
   /// Creates an account and signs into it.
@@ -49,7 +49,30 @@ class AuthService {
     );
 
     await _saveSession(data);
-    return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
+    return _resolveUser(data);
+  }
+
+  /// The user a session belongs to, confirmed against the server.
+  ///
+  /// Sign-in and registration both used to trust the `user` object in their own
+  /// response and stop there. `/api/auth/me` was the only endpoint that
+  /// reported membership, so somebody who had just signed in was, as far as the
+  /// interface was concerned, not a member — and was invited to become one when
+  /// they tried to post an opportunity. Reloading the page fixed it, because
+  /// session restore calls `/me`.
+  ///
+  /// The Worker now returns the same shape from all three. This second call
+  /// stays as the belt to that braces: whatever `/me` learns to report next
+  /// reaches a freshly signed-in member without a second round of this bug.
+  Future<AppUser> _resolveUser(Map<String, dynamic> data) async {
+    try {
+      final Map<String, dynamic> me = await _api.get('/api/auth/me');
+      return AppUser.fromJson(me);
+    } catch (_) {
+      // The session is already saved and valid; a failed refresh should not
+      // turn a successful sign-in into an error.
+      return AppUser.fromJson((data['user'] as Map<String, dynamic>?) ?? <String, dynamic>{});
+    }
   }
 
   /// Signs in using a reset token, for somebody who has just changed their

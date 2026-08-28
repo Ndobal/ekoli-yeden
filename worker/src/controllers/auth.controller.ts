@@ -111,7 +111,9 @@ export async function register(context: RequestContext): Promise<Response> {
         status: 'active',
         roles: ['okoli_member'],
         permissions: [],
-        isMember: false,
+        // `ensureMembership` above created it. This said `false` for as long as
+        // registration has been creating memberships.
+        isMember: true,
       },
       message:
         'Welcome to Ekoli-Yeden. Your account and your membership are ready — fill in your '
@@ -228,7 +230,7 @@ export async function login(context: RequestContext): Promise<Response> {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresIn: tokens.expiresIn,
-        user: serializeUser(user),
+        user: serializeUser(user, await membershipFor(context.env.DB, user.id)),
       },
       { headers: NO_STORE_HEADERS },
     );
@@ -310,20 +312,10 @@ export async function me(context: RequestContext): Promise<Response> {
   // it, so the question is asked on pages that have no other reason to know
   // anything about membership, and asking it here costs one indexed lookup on
   // a call the client already makes.
-  const profile = await context.env.DB.prepare(
-    'SELECT "handle", "membership_status", "membership_number" FROM "member_profiles" WHERE "user_id" = ? LIMIT 1',
-  )
-    .bind(context.user.id)
-    .first<{ handle: string; membership_status: string; membership_number: string }>();
-
+  // The same shape as login and registration, from the same helper, so the
+  // three can no longer disagree about whether somebody is a member.
   return json(
-    {
-      ...serializeUser(context.user),
-      isMember: profile?.membership_status === 'active',
-      handle: profile?.handle ?? null,
-      membershipNumber: profile?.membership_number ?? null,
-      membershipStatus: profile?.membership_status ?? null,
-    },
+    serializeUser(context.user, await membershipFor(context.env.DB, context.user.id)),
     { headers: NO_STORE_HEADERS },
   );
 }
@@ -348,14 +340,17 @@ export async function preservationTeamStructure(_context: RequestContext): Promi
   });
 }
 
-function serializeUser(user: {
-  id: string;
-  email: string;
-  displayName: string;
-  status: string;
-  roles: string[];
-  permissions: Set<string>;
-}): Record<string, unknown> {
+function serializeUser(
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+    status: string;
+    roles: string[];
+    permissions: Set<string>;
+  },
+  membership?: { handle?: string | null; membershipStatus?: string | null; membershipNumber?: string | null },
+): Record<string, unknown> {
   return {
     id: user.id,
     email: user.email,
@@ -363,6 +358,39 @@ function serializeUser(user: {
     status: user.status,
     roles: user.roles,
     permissions: [...user.permissions],
+
+    // Membership travels with EVERY auth response, not only with `/me`.
+    //
+    // It used to be added by `/me` alone, so signing in returned a user with
+    // no membership flag at all and the client read it as `false`. A member who
+    // had just signed in was told to become a member — until they reloaded the
+    // page, at which point session restore called `/me` and it came right.
+    //
+    // Anything the client decides from must be in the response that creates
+    // the session, not only in a later one it may not make.
+    isMember: (membership?.membershipStatus ?? null) === 'active',
+    handle: membership?.handle ?? null,
+    membershipNumber: membership?.membershipNumber ?? null,
+    membershipStatus: membership?.membershipStatus ?? null,
+  };
+}
+
+/** The membership row every auth response needs. */
+async function membershipFor(
+  db: D1Database,
+  userId: string,
+): Promise<{ handle: string | null; membershipStatus: string | null; membershipNumber: string | null }> {
+  const row = await db
+    .prepare(
+      'SELECT "handle", "membership_status", "membership_number" FROM "member_profiles" WHERE "user_id" = ? LIMIT 1',
+    )
+    .bind(userId)
+    .first<{ handle: string; membership_status: string; membership_number: string }>();
+
+  return {
+    handle: row?.handle ?? null,
+    membershipStatus: row?.membership_status ?? null,
+    membershipNumber: row?.membership_number ?? null,
   };
 }
 

@@ -168,13 +168,19 @@ class _ComposerState extends State<_Composer> {
           reading: true,
           title: 'You cannot post here yet',
           description: view.viewer.blockedReason,
+          // A member who is blocked is usually blocked by a moderator, not by a
+          // missing membership — so sending everyone to the joining form told a
+          // sanctioned member to join something they are already in. Offering
+          // it only to somebody who is not signed in leaves the rest with the
+          // reason the server gave, which is the part they can act on.
           child: Row(
             children: <Widget>[
-              FilledButton(
-                onPressed: () => context.go(AppRoutes.join),
-                child: const Text('Complete your membership'),
-              ),
-              const Gap.hLg(),
+              if (!context.watch<AuthController>().isSignedIn)
+                FilledButton(
+                  onPressed: () => context.go(AppRoutes.join),
+                  child: const Text('Create an account'),
+                ),
+              if (!context.watch<AuthController>().isSignedIn) const Gap.hLg(),
               TextButton(
                 onPressed: () => context.go(AppRoutes.forumSpace(widget.space)),
                 child: const Text('Back to the space'),

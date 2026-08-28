@@ -170,7 +170,11 @@ class _ContributePageState extends State<ContributePage> {
             // know about a photograph, is the worst possible moment to say so.
             child: _receipt != null
                 ? _Receipt(receipt: _receipt!)
-                : context.watch<AuthController>().canContribute
+                // Signed in is the question. `canContribute` reads a
+                // membership flag that used to arrive only from `/api/auth/me`,
+                // so a member who had just signed in was shown the gate until
+                // they reloaded. The Worker decides who may actually submit.
+                : context.watch<AuthController>().isSignedIn
                     ? _buildForm(context)
                     : const _MembershipGate(),
           ),

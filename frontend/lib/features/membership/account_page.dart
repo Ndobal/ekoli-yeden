@@ -16,6 +16,7 @@ import '../../core/widgets/seo_head.dart';
 import '../../models/member.dart';
 import '../../models/community_group.dart';
 import 'dashboard_sections.dart';
+import 'member_shell.dart';
 import 'memorial_notice.dart';
 import '../../repositories/group_repository.dart';
 import '../../repositories/member_repository.dart';
@@ -47,19 +48,49 @@ class _AccountPageState extends State<AccountPage> {
 
   void _reload() => setState(() => _reloads += 1);
 
+  /// The line under "Dashboard". Uses the first name only — the whole display
+  /// name in a greeting reads like a form letter.
+  static String _greeting(String? displayName) {
+    final String first = (displayName ?? '').trim().split(RegExp(r'\s+')).first;
+    final int hour = DateTime.now().hour;
+    final String part = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
+    return first.isEmpty ? part : '$part, $first';
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthController auth = context.watch<AuthController>();
     final MemberRepository repository = context.read<MemberRepository>();
 
-    return AppScaffold(
+    // Signed out, this is still a public page and keeps the public scaffold.
+    // Signed in, it becomes the member's own workspace and takes the shell that
+    // carries only their tools.
+    if (!auth.isSignedIn) {
+      return const AppScaffold(
+        currentPath: AppRoutes.account,
+        seo: SeoMetadata(
+          title: 'Your account',
+          description: 'Your Ekoli-Yeden account.',
+          canonicalPath: AppRoutes.account,
+          noIndex: true,
+        ),
+        child: _SignedOut(),
+      );
+    }
+
+    return MemberShell(
       currentPath: AppRoutes.account,
-      seo: const SeoMetadata(
-        title: 'Your account',
-        description: 'Your Ekoli-Yeden account.',
-        canonicalPath: AppRoutes.account,
-        noIndex: true,
-      ),
+      title: 'Dashboard',
+      subtitle: _greeting(auth.user?.displayName),
+      searchHint: 'Search the archive, the directory, opportunities…',
+      onSearch: (String term) {
+        if (term.trim().isEmpty) return;
+        context.go(AppRoutes.searchFor(term.trim()));
+      },
       child: !auth.isSignedIn
           ? const _SignedOut()
           : AsyncContent<MemberDashboard?>(
@@ -156,6 +187,13 @@ class _Account extends StatelessWidget {
       children: <Widget>[
         _AccountHeader(profile: profile, justJoinedNumber: justJoinedNumber),
 
+        // WHAT A MEMBER CAME HERE TO DO, IN ONE CLICK EACH.
+        //
+        // Every one of these used to be two or three steps inside a menu built
+        // for visitors. They are the whole reason somebody signs in, so they go
+        // above everything, including the profile nudge.
+        const _QuickActions(),
+
         // Above everything, and before anything else on the page can be read.
         // An account recorded as belonging to somebody who has died must learn
         // of it the moment its holder signs in — see `MemorialNoticeBanner`.
@@ -228,6 +266,141 @@ class _Account extends StatelessWidget {
           child: _PrivacySummary(profile: profile),
         ),
       ],
+    );
+  }
+}
+
+/// THE FIVE THINGS A MEMBER ACTUALLY SIGNS IN TO DO.
+///
+/// Each one goes straight to the thing. No intermediate page explaining what
+/// the thing is, no menu to open first, and — for posting an opportunity — no
+/// invitation to become a member somebody already is.
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    const List<(IconData, String, String, String)> actions =
+        <(IconData, String, String, String)>[
+      (
+        Icons.campaign_outlined,
+        'Post an opportunity',
+        'A job, scholarship or grant',
+        AppRoutes.postOpportunity,
+      ),
+      (
+        Icons.edit_note_outlined,
+        'Send in material',
+        'Photographs, documents, stories',
+        AppRoutes.contribute,
+      ),
+      (
+        Icons.person_add_alt,
+        'Add somebody',
+        'Build a biography for the archive',
+        AppRoutes.contributePerson,
+      ),
+      (
+        Icons.mail_outline,
+        'Write to a member',
+        'Find somebody and message them',
+        AppRoutes.messages,
+      ),
+      (
+        Icons.newspaper_outlined,
+        'Send in news',
+        'Something the community should know',
+        AppRoutes.contributeNews,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, AppSpacing.xl, 0, 0),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final int columns = constraints.maxWidth > 1100
+              ? 5
+              : constraints.maxWidth > 780
+                  ? 3
+                  : constraints.maxWidth > 520
+                      ? 2
+                      : 1;
+
+          return GridView.count(
+            crossAxisCount: columns,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: AppSpacing.md,
+            crossAxisSpacing: AppSpacing.md,
+            childAspectRatio: columns == 1 ? 5.2 : 1.62,
+            children: <Widget>[
+              for (final (IconData icon, String label, String blurb, String path) in actions)
+                _QuickAction(icon: icon, label: label, blurb: blurb, path: path),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.blurb,
+    required this.path,
+  });
+
+  final IconData icon;
+  final String label;
+  final String blurb;
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return InkWell(
+      onTap: () => context.go(path),
+      borderRadius: AppRadius.lgAll,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: AppRadius.lgAll,
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: const BoxDecoration(
+                color: AppColors.navy,
+                borderRadius: AppRadius.mdAll,
+              ),
+              child: Icon(icon, color: Colors.white, size: 19),
+            ),
+            const Gap.sm(),
+            Text(
+              label,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              blurb,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -127,7 +127,7 @@ class _PostOpportunityPageState extends State<PostOpportunityPage> {
             'A job, scholarship, training place or grant that somebody here might be right for.',
         child: _done != null
             ? _Submitted(message: _done!)
-            : !auth.canContribute
+            : !auth.isSignedIn
                 ? const _MembersOnly()
                 : Form(
                     key: _formKey,
@@ -412,6 +412,16 @@ class _Submitted extends StatelessWidget {
   }
 }
 
+/// Shown to somebody who is NOT SIGNED IN. Never to a member.
+///
+/// This used to test `canContribute`, which reads a membership flag that only
+/// `/api/auth/me` ever set — so a member who had just signed in was told to
+/// become a member they already were, and posting worked only after a page
+/// reload. The flag is fixed at both ends now, and this gate no longer depends
+/// on it: being signed in is the question, and the Worker decides the rest.
+///
+/// That is the right division anyway. The client hides a control to save
+/// somebody a pointless journey; it is not what stops anyone posting.
 class _MembersOnly extends StatelessWidget {
   const _MembersOnly();
 
@@ -426,9 +436,20 @@ class _MembersOnly extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         const Gap.xl(),
-        FilledButton(
-          onPressed: () => context.go(AppRoutes.join),
-          child: const Text('Become a member'),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            FilledButton(
+              onPressed: () =>
+                  context.go(AppRoutes.signInReturningTo(AppRoutes.postOpportunity)),
+              child: const Text('Sign in'),
+            ),
+            OutlinedButton(
+              onPressed: () => context.go(AppRoutes.join),
+              child: const Text('Create an account'),
+            ),
+          ],
         ),
       ],
     );

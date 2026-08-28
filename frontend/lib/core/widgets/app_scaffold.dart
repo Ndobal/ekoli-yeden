@@ -8,6 +8,7 @@ import '../config/cms_controller.dart';
 import '../errors/app_exception.dart';
 import '../config/site_settings_controller.dart';
 import '../routing/app_routes.dart';
+import '../../features/membership/member_shell.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -42,6 +43,26 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final SiteSettings settings = context.watch<SiteSettingsController>().settings;
     final List<NavItem> primary = context.watch<CmsController>().primaryNavigationOrFallback;
+
+    // A SIGNED-IN MEMBER ON ONE OF THEIR OWN PAGES GETS THEIR OWN SHELL.
+    //
+    // Decided here rather than page by page, because these pages are not all
+    // member pages: `/opportunities` and the forums are public to a visitor and
+    // a workspace to a member, and the same widget has to serve both. Doing it
+    // in each page would mean the same branch written a dozen times, and one of
+    // them eventually forgotten.
+    //
+    // The effect is that the member's tools stay in the sidebar as they move
+    // between them, instead of the sidebar vanishing the moment they follow one
+    // of its own links.
+    final MemberNavItem? memberPage = memberPageFor(currentPath);
+    if (memberPage != null && context.watch<AuthController>().isSignedIn) {
+      return MemberShell(
+        currentPath: currentPath,
+        title: memberPage.label,
+        child: child,
+      );
+    }
 
     return Scaffold(
       drawer: context.hasRoomForNavBar

@@ -215,7 +215,8 @@ class _ContributePersonPageState extends State<ContributePersonPage> {
             'people can add to it later.',
         child: _reference != null
             ? _Submitted(reference: _reference!)
-            : !auth.canContribute
+            // Signed in, not the membership flag — see `contribute_page.dart`.
+            : !auth.isSignedIn
                 ? const _MembersOnly()
                 : Form(key: _formKey, child: _buildForm(theme)),
       ),
