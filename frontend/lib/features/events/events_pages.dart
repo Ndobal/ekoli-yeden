@@ -7,10 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
-import '../../core/widgets/page_shell.dart';
-import '../../core/widgets/seo_head.dart';
 import '../../core/widgets/state_views.dart';
 import '../../models/calendar_entry.dart';
 import '../../models/content_record.dart';
@@ -27,37 +24,30 @@ import '../shared/content_detail_page.dart';
 /// missing from its own list of what is happening. So both are here, each
 /// linking back to the kind of page that suits it — an event to its own page, a
 /// festival to the festival page with its editions and its programme.
-class EventsListPage extends StatefulWidget {
-  const EventsListPage({super.key});
+/// WHAT IS HAPPENING, AS A BROWSABLE BLOCK.
+///
+/// Extracted from the page that used to hold it so News can show it in a tab.
+/// "What is happening in Ekoli-Yeden" is one question, and answering half of it
+/// under News and half under Events meant somebody looking for a meeting found
+/// the announcement about it in a different section from the date of it.
+///
+/// The page at `/events` still exists and still works: it renders News with
+/// this tab already open. A URL printed on a poster has to keep resolving.
+class EventsBrowser extends StatefulWidget {
+  const EventsBrowser({super.key});
 
   @override
-  State<EventsListPage> createState() => _EventsListPageState();
+  State<EventsBrowser> createState() => _EventsBrowserState();
 }
 
-class _EventsListPageState extends State<EventsListPage> {
+class _EventsBrowserState extends State<EventsBrowser> {
   String? _type;
 
   @override
   Widget build(BuildContext context) {
     final EventRepository repository = context.read<EventRepository>();
 
-    return AppScaffold(
-      currentPath: AppRoutes.events,
-      seo: const SeoMetadata(
-        title: 'Events',
-        description:
-            'Meetings, ceremonies, festivals and gatherings of Ekoli-Yeden — what is coming, and '
-            'what has already been held.',
-        canonicalPath: AppRoutes.events,
-      ),
-      child: PageSection(
-        eyebrow: 'What is happening',
-        title: 'Events',
-        description:
-            'Meetings, ceremonies, festivals and gatherings of Ekoli-Yeden — what is coming, and '
-            'what has already been held. Each one keeps its own photographs, so an occasion can '
-            'still be seen years later.',
-        child: AsyncContent<EventsCalendar>(
+    return AsyncContent<EventsCalendar>(
           key: ValueKey<String>(_type ?? 'all'),
           load: () => repository.calendar(type: _type),
           loadingMessage: 'Loading…',
@@ -109,8 +99,6 @@ class _EventsListPageState extends State<EventsListPage> {
               ],
             );
           },
-        ),
-      ),
     );
   }
 }

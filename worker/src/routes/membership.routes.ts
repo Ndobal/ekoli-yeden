@@ -13,6 +13,8 @@ import {
   updateMyInterests,
   updateMyPrivacy,
   updateMyProfile,
+  uploadProfilePhoto,
+  removeProfilePhoto,
   updateMySkills,
   directoryFacets,
   searchDirectory,
@@ -109,6 +111,26 @@ export const membershipRoutes: RouteDefinition[] = [
     handler: updateMyProfile,
     middleware: [requireAuth],
     description: 'Save one stage of your profile. Everything is optional',
+  },
+
+  // A member's own portrait and the band behind it.
+  //
+  // `requireAuth` and nothing more: this writes to the avatars folder and to
+  // the caller's own profile row, and to no other folder or row. The narrowness
+  // is what makes it safe to expose without a media permission.
+  {
+    method: 'POST',
+    path: '/api/membership/me/photo',
+    handler: uploadProfilePhoto,
+    middleware: [requireAuth],
+    description: 'Set your profile picture or cover image (?kind=avatar|cover)',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/membership/me/photo',
+    handler: removeProfilePhoto,
+    middleware: [requireAuth],
+    description: 'Take your profile picture or cover image off your profile',
   },
   {
     method: 'PATCH',

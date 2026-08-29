@@ -44,6 +44,7 @@ import {
   changeFestivalStatus,
   createFestival,
   ensureFestivalGallery,
+  addFestivalYear,
   festivalGalleryIndex,
 } from '../controllers/festival.controller';
 import {
@@ -225,6 +226,16 @@ export const adminRoutes: RouteDefinition[] = [
     handler: ensureFestivalGallery,
     middleware: [requirePermission('galleries:create')],
     description: "A festival's album, created if it does not exist yet",
+  },
+  // Adding a year to a festival: Leboku 2025, Leboku 2024. The album is an
+  // ordinary gallery carrying `festival_id` and `year`, which is what puts it
+  // in the festival's archive and the Gallery's album list at once.
+  {
+    method: 'POST',
+    path: '/api/admin/festivals/:id/years',
+    handler: addFestivalYear,
+    middleware: [requirePermission('galleries:create')],
+    description: 'Add a year to a festival',
   },
   // Registered ahead of the generated festival routes so that creating an
   // edition creates its album, and publishing one publishes its photographs.

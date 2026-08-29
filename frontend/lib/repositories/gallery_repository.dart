@@ -67,9 +67,57 @@ class GalleryRepository {
   /// Creates any album that is missing as a side effect, which is how an
   /// edition added before festivals had galleries repairs itself by being
   /// looked at.
-  Future<List<FestivalAlbum>> festivalAlbums() async {
+  /// Every festival with its years beneath it.
+  Future<List<FestivalWithYears>> festivalAlbums() async {
     final Map<String, dynamic> data = await _api.get('/api/admin/festival-galleries');
-    return Json.objectList(data, 'items').map(FestivalAlbum.fromJson).toList(growable: false);
+    return Json.objectList(data, 'items')
+        .map(FestivalWithYears.fromJson)
+        .toList(growable: false);
+  }
+
+  /// Records a new festival — Odagum, Ekpirikum, whatever the community
+  /// celebrates. The parent only: a festival just recorded has no year yet.
+  Future<String> createFestival({
+    required String name,
+    String? shortDescription,
+    String? description,
+    String? usuallyCelebrated,
+  }) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/admin/festivals',
+      body: <String, dynamic>{
+        'name': name,
+        'slug': name.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-'),
+        'short_description': ?shortDescription,
+        'description': ?description,
+        'usually_celebrated': ?usuallyCelebrated,
+        'status': 'published',
+      },
+    );
+    return Json.str(data, 'id');
+  }
+
+  /// Adds a year to a festival: Leboku 2025, Leboku 2024.
+  ///
+  /// The album is an ordinary gallery, which is what puts it in the festival's
+  /// archive and the Gallery's album list at once without a second record.
+  Future<String> addFestivalYear({
+    required String festivalId,
+    required int year,
+    String? title,
+    String? description,
+    String? location,
+  }) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/admin/festivals/$festivalId/years',
+      body: <String, dynamic>{
+        'year': year,
+        'title': ?title,
+        'description': ?description,
+        'location': ?location,
+      },
+    );
+    return Json.str(data, 'message', fallback: 'Year added.');
   }
 
   /// An album's contents in every status, for the person cataloguing it.

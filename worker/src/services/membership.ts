@@ -249,6 +249,7 @@ export function visibleProfile(
     headline: profile['headline'],
     bio: profile['bio'],
     avatar_url: profile['avatar_url'] ?? null,
+    cover_url: profile['cover_url'] ?? null,
     connection: profile['connection'],
     connection_note: profile['connection_note'],
     // Shown to anybody who may see the profile at all. What somebody is to
@@ -500,11 +501,52 @@ export function handleFrom(name: string, fallback: string): string {
   return base === '' ? fallback : base;
 }
 
-/** `YK-XXXXXX` — quotable down a phone line, no ambiguous characters. */
-export function membershipNumber(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  let code = '';
-  for (const byte of bytes) code += alphabet[byte % alphabet.length];
-  return `YK-${code}`;
+/**
+ * `Okoli-2026-0001` — the year somebody joined, and how many had joined before.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS COUNTED RATHER THAN RANDOM
+ * ---------------------------------------------------------------------------
+ *
+ * It used to be `YK-` and six random characters. That is a fine identifier and
+ * a poor membership number: it says nothing, sorts into no order, and two
+ * people comparing theirs learn nothing about either.
+ *
+ * A counted number says when you joined and roughly where you stand in the
+ * order of it, which is the thing a membership number is actually for in a
+ * community that will still be adding people in fifty years.
+ *
+ * The count restarts each year, so 2027 begins again at 0001 and the year
+ * carries the rest of the meaning. Four digits, and it widens rather than
+ * wrapping if a year ever brings more than 9,999 people.
+ *
+ * ---------------------------------------------------------------------------
+ * ON THE RACE
+ * ---------------------------------------------------------------------------
+ *
+ * Reading the highest and adding one is not atomic, and two people registering
+ * in the same second could compute the same number. `membership_number` is
+ * UNIQUE, so the second write fails rather than issuing a duplicate — and the
+ * caller retries. Losing a number to a collision is harmless; issuing the same
+ * one to two people is not, and the constraint is what guarantees which of
+ * those happens.
+ */
+export async function nextMembershipNumber(db: D1Database, when?: Date): Promise<string> {
+  const year = (when ?? new Date()).getUTCFullYear();
+  const prefix = `Okoli-${year}-`;
+
+  const row = await db
+    .prepare(
+      `SELECT "membership_number" FROM "member_profiles"
+       WHERE "membership_number" LIKE ?
+       ORDER BY LENGTH("membership_number") DESC, "membership_number" DESC
+       LIMIT 1`,
+    )
+    .bind(`${prefix}%`)
+    .first<{ membership_number: string }>();
+
+  const highest = row ? Number.parseInt(row.membership_number.slice(prefix.length), 10) : 0;
+  const next = (Number.isFinite(highest) ? highest : 0) + 1;
+
+  return `${prefix}${String(next).padStart(4, '0')}`;
 }

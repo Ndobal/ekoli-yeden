@@ -236,63 +236,86 @@ class Gallery {
   /// with what is actually on the page.
   int get videoCount => items.where((Photograph item) => item.isVideo).length;
 }
-
-/// A festival's album as the workspace lists it: the year, the album, and how
-/// many photographs are in it, so a Media Team volunteer picks a year rather
-/// than hunting for an album by name.
-class FestivalAlbum {
-  const FestivalAlbum({
+/// A FESTIVAL AND ITS YEARS, FOR THE WORKSPACE.
+///
+/// This used to be flat — one row per festival, holding one album — because a
+/// festival WAS a year. Since migration 0036 a festival is the permanent
+/// parent and each year is an album beneath it, so this is nested to match.
+///
+/// A festival with no years is an ordinary state: somebody has recorded that
+/// Odagum exists and has not yet added a celebration of it.
+class FestivalWithYears {
+  const FestivalWithYears({
     required this.festivalId,
     required this.festivalName,
-    required this.year,
+    required this.years,
+    this.festivalSlug,
+    this.festivalStatus,
+    this.shortDescription,
+  });
+
+  factory FestivalWithYears.fromJson(Map<String, dynamic> json) => FestivalWithYears(
+    festivalId: Json.str(json, 'festival_id'),
+    festivalName: Json.str(json, 'festival_name', fallback: 'Festival'),
+    festivalSlug: Json.strOrNull(json, 'festival_slug'),
+    festivalStatus: Json.strOrNull(json, 'festival_status'),
+    shortDescription: Json.strOrNull(json, 'short_description'),
+    years: Json.objectList(json, 'years')
+        .map(FestivalYear.fromJson)
+        .toList(growable: false),
+  );
+
+  final String festivalId;
+  final String festivalName;
+  final String? festivalSlug;
+  final String? festivalStatus;
+  final String? shortDescription;
+  final List<FestivalYear> years;
+
+  /// The years already recorded, so the "add a year" form can refuse a repeat
+  /// before the request rather than after it.
+  Set<int> get recordedYears =>
+      years.map((FestivalYear y) => y.year).whereType<int>().toSet();
+}
+
+/// One year of a festival — an ordinary gallery, carrying a festival and a year.
+class FestivalYear {
+  const FestivalYear({
     required this.galleryId,
     required this.gallerySlug,
     required this.galleryTitle,
     required this.galleryStatus,
-    required this.total,
-    this.festivalSlug,
-    this.festivalStatus,
-    this.counts = const <String, int>{},
+    this.year,
+    this.photoCount = 0,
+    this.videoCount = 0,
   });
 
-  factory FestivalAlbum.fromJson(Map<String, dynamic> json) {
-    final Map<String, dynamic> counts =
-        (json['counts'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+  factory FestivalYear.fromJson(Map<String, dynamic> json) => FestivalYear(
+    galleryId: Json.str(json, 'gallery_id'),
+    gallerySlug: Json.str(json, 'gallery_slug'),
+    galleryTitle: Json.str(json, 'gallery_title', fallback: 'Album'),
+    galleryStatus: Json.str(json, 'gallery_status', fallback: 'draft'),
+    year: Json.intOrNull(json, 'year'),
+    photoCount: Json.intVal(json, 'photo_count'),
+    videoCount: Json.intVal(json, 'video_count'),
+  );
 
-    return FestivalAlbum(
-      festivalId: Json.str(json, 'festival_id'),
-      festivalName: Json.str(json, 'festival_name', fallback: 'Festival'),
-      year: Json.intVal(json, 'year'),
-      galleryId: Json.str(json, 'gallery_id'),
-      gallerySlug: Json.str(json, 'gallery_slug'),
-      galleryTitle: Json.str(json, 'gallery_title'),
-      galleryStatus: Json.str(json, 'gallery_status'),
-      total: Json.intVal(json, 'total'),
-      festivalSlug: Json.strOrNull(json, 'festival_slug'),
-      festivalStatus: Json.strOrNull(json, 'festival_status'),
-      counts: counts.map(
-        (String key, dynamic value) =>
-            MapEntry<String, int>(key, value is num ? value.toInt() : 0),
-      ),
-    );
-  }
-
-  final String festivalId;
-  final String festivalName;
-  final int year;
   final String galleryId;
   final String gallerySlug;
   final String galleryTitle;
   final String galleryStatus;
-  final int total;
-  final String? festivalSlug;
-  final String? festivalStatus;
+  final int? year;
+  final int photoCount;
+  final int videoCount;
 
-  /// Photographs per status, so the workspace can say how many are still draft.
-  final Map<String, int> counts;
+  int get total => photoCount + videoCount;
 
-  String get displayName => '$festivalName $year';
-
-  int get published => counts['published'] ?? 0;
-  int get awaiting => total - published;
+  /// "12 photographs and 3 films", or what is true of it.
+  String get holdings {
+    final List<String> parts = <String>[
+      if (photoCount > 0) '$photoCount photograph${photoCount == 1 ? '' : 's'}',
+      if (videoCount > 0) '$videoCount film${videoCount == 1 ? '' : 's'}',
+    ];
+    return parts.isEmpty ? 'Empty' : parts.join(' and ');
+  }
 }

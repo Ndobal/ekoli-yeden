@@ -319,6 +319,24 @@ export class GalleryRepository {
     return result.results ?? [];
   }
 
+  /// A slug nobody else is using, by suffixing until it is free.
+  ///
+  /// "leboku-2026" is taken by the album seeded before the restructuring, so a
+  /// second attempt becomes "leboku-2026-2" rather than failing on the UNIQUE
+  /// constraint and losing whatever the person had typed.
+  async uniqueSlug(base: string): Promise<string> {
+    const root = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const candidate = attempt === 0 ? root : `${root}-${attempt + 1}`;
+      const clash = await this.db
+        .prepare('SELECT 1 FROM "galleries" WHERE "slug" = ? LIMIT 1')
+        .bind(candidate)
+        .first();
+      if (!clash) return candidate;
+    }
+    return `${root}-${Date.now()}`;
+  }
+
   async createGallery(values: {
     id?: string;
     slug: string;
@@ -329,7 +347,9 @@ export class GalleryRepository {
     location: string | null;
     festivalId: string | null;
     isFestivalGallery: boolean;
-    sortOrder: number;
+    /// Which year's celebration this album is. See migration 0036.
+    year?: number | null;
+    sortOrder?: number;
     status: string;
   }): Promise<string> {
     const id = values.id ?? newId();
@@ -339,8 +359,9 @@ export class GalleryRepository {
       .prepare(
         `INSERT INTO "galleries"
            ("id", "slug", "title", "description", "category", "event_date", "location",
-            "festival_id", "is_festival_gallery", "sort_order", "status", "created_at", "updated_at")
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            "festival_id", "is_festival_gallery", "year", "sort_order", "status",
+            "created_at", "updated_at")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -352,7 +373,8 @@ export class GalleryRepository {
         values.location,
         values.festivalId,
         values.isFestivalGallery ? 1 : 0,
-        values.sortOrder,
+        values.year ?? null,
+        values.sortOrder ?? 0,
         values.status,
         timestamp,
         timestamp,

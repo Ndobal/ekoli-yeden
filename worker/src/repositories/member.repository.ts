@@ -130,11 +130,13 @@ export class MemberRepository {
       .prepare(
         `SELECT p.*, u."email", u."display_name", u."status" AS account_status,
                 pr."name" AS profession, pr."slug" AS profession_slug,
-                ma."storage_key" AS avatar_storage_key
+                ma."storage_key" AS avatar_storage_key,
+                mc."storage_key" AS cover_storage_key
          FROM "member_profiles" p
          INNER JOIN "users" u ON u."id" = p."user_id"
          LEFT JOIN "professions" pr ON pr."id" = p."profession_id"
          LEFT JOIN "media_assets" ma ON ma."id" = p."avatar_media_id"
+         LEFT JOIN "media_assets" mc ON mc."id" = p."cover_media_id"
          WHERE p."user_id" = ? LIMIT 1`,
       )
       .bind(userId)
@@ -147,11 +149,13 @@ export class MemberRepository {
       .prepare(
         `SELECT p.*, u."email", u."display_name", u."status" AS account_status,
                 pr."name" AS profession, pr."slug" AS profession_slug,
-                ma."storage_key" AS avatar_storage_key
+                ma."storage_key" AS avatar_storage_key,
+                mc."storage_key" AS cover_storage_key
          FROM "member_profiles" p
          INNER JOIN "users" u ON u."id" = p."user_id"
          LEFT JOIN "professions" pr ON pr."id" = p."profession_id"
          LEFT JOIN "media_assets" ma ON ma."id" = p."avatar_media_id"
+         LEFT JOIN "media_assets" mc ON mc."id" = p."cover_media_id"
          WHERE p."handle" = ? LIMIT 1`,
       )
       .bind(handle)

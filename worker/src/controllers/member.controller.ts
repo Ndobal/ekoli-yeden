@@ -1,5 +1,11 @@
 import type { RequestContext } from '../types/api';
 import { MembershipService } from '../services/membership.service';
+import { MediaService } from '../services/media.service';
+import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
+import { ValidationError } from '../utils/errors';
+import { CONTENT_STATUS } from '../types/models';
+import { R2_FOLDERS } from '../utils/files';
+import { nowIso } from '../utils/id';
 import { MemberRepository } from '../repositories/member.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
 import {
@@ -499,4 +505,100 @@ export async function searchDirectory(context: RequestContext): Promise<Response
 export async function directoryFacets(context: RequestContext): Promise<Response> {
   const facets = await new MemberRepository(context.env.DB).directoryFacets();
   return json(facets, { headers: publicCacheHeaders() });
+}
+
+/**
+ * `POST /api/membership/me/photo?kind=avatar|cover`
+ *
+ * A member's own portrait, and the band behind it.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS RATHER THAN REUSING THE MEDIA LIBRARY
+ * ---------------------------------------------------------------------------
+ *
+ * `POST /api/admin/media` needs `media:create`, which an ordinary member does
+ * not have and should not be given — that endpoint writes to every folder in
+ * the archive. So `avatar_media_id` was a writable column on a profile with no
+ * way for the profile's owner to fill it: the field existed and the person it
+ * belonged to could not use it.
+ *
+ * This is the narrow version. It writes to the avatars folder and nowhere
+ * else, which is the one place `ALLOWED_MIME_TYPES` restricts to stills — a
+ * moving profile picture is not something the archive needs, and this is the
+ * only folder every signed-in member can write to.
+ *
+ * The asset is PUBLISHED immediately, unlike a contribution. A portrait is not
+ * a claim about the community's history that somebody has to check; it is a
+ * person saying what they look like, and holding it in a review queue would
+ * mean their own profile showed a stranger's initials for a week.
+ */
+export async function uploadProfilePhoto(context: RequestContext): Promise<Response> {
+  const user = context.user;
+  if (!user) throw new UnauthorizedError('Please sign in to continue.');
+
+  const kind = (context.query.get('kind') ?? 'avatar').toLowerCase();
+  if (kind !== 'avatar' && kind !== 'cover') {
+    throw new ValidationError({ kind: ['Choose either "avatar" or "cover".'] });
+  }
+
+  const service = new MembershipService(context.env);
+  const profile = await service.requireOwnProfile(user);
+
+  const media = new MediaService(context.env);
+  const result = await media.upload(context.request, user, {
+    defaultStatus: CONTENT_STATUS.PUBLISHED,
+    // Both go to `avatars`: stills only, and a tighter size ceiling than the
+    // rest of the archive. A cover is still a picture of a person's own page.
+    forceFolder: R2_FOLDERS.AVATARS,
+  });
+
+  const column = kind === 'avatar' ? 'avatar_media_id' : 'cover_media_id';
+  await context.env.DB.prepare(
+    `UPDATE "member_profiles" SET "${column}" = ?, "updated_at" = ? WHERE "id" = ?`,
+  )
+    .bind(result.id, nowIso(), profile.id)
+    .run();
+
+  await new AuditRepository(context.env.DB).record({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: AUDIT_ACTIONS.MEDIA_UPLOADED,
+    resourceType: 'member_profile',
+    resourceId: String(profile.id),
+    changes: { kind, mediaAssetId: result.id },
+    requestId: context.requestId,
+  });
+
+  return json(
+    { ...result, kind, message: kind === 'avatar' ? 'Your picture is set.' : 'Your cover is set.' },
+    { status: 201, headers: NO_STORE_HEADERS },
+  );
+}
+
+/**
+ * `DELETE /api/membership/me/photo?kind=avatar|cover`
+ *
+ * Takes the picture off the profile. The asset stays in the archive rather
+ * than being deleted, because it may already be attached to something else.
+ */
+export async function removeProfilePhoto(context: RequestContext): Promise<Response> {
+  const user = context.user;
+  if (!user) throw new UnauthorizedError('Please sign in to continue.');
+
+  const kind = (context.query.get('kind') ?? 'avatar').toLowerCase();
+  if (kind !== 'avatar' && kind !== 'cover') {
+    throw new ValidationError({ kind: ['Choose either "avatar" or "cover".'] });
+  }
+
+  const service = new MembershipService(context.env);
+  const profile = await service.requireOwnProfile(user);
+
+  const column = kind === 'avatar' ? 'avatar_media_id' : 'cover_media_id';
+  await context.env.DB.prepare(
+    `UPDATE "member_profiles" SET "${column}" = NULL, "updated_at" = ? WHERE "id" = ?`,
+  )
+    .bind(nowIso(), profile.id)
+    .run();
+
+  return json({ kind, removed: true }, { headers: NO_STORE_HEADERS });
 }

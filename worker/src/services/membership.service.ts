@@ -9,7 +9,7 @@ import {
   handleFrom,
   isDiaspora,
   isInEkoliYeden,
-  membershipNumber,
+  nextMembershipNumber,
   visibleProfile,
   workGroupFor,
   type ViewerRelationship,
@@ -84,7 +84,7 @@ export class MembershipService {
 
     const profileId = await this.members.create({
       userId: user.id,
-      membershipNumber: membershipNumber(),
+      membershipNumber: await nextMembershipNumber(this.env.DB),
       handle,
       fullName,
       membershipStatus: status,
@@ -171,7 +171,7 @@ export class MembershipService {
 
     const profileId = await this.members.create({
       userId: user.id,
-      membershipNumber: membershipNumber(),
+      membershipNumber: await nextMembershipNumber(this.env.DB),
       handle,
       fullName,
       membershipStatus: status,
@@ -272,17 +272,19 @@ export class MembershipService {
       this.members.interestsFor(profileId),
     ]);
 
-    const storageKey = row['avatar_storage_key'];
-    const avatarUrl =
-      typeof storageKey === 'string' && storageKey !== ''
-        ? publicMediaUrl(this.env.PUBLIC_MEDIA_BASE_URL, storageKey)
+    const toUrl = (value: unknown): string | null =>
+      typeof value === 'string' && value !== ''
+        ? publicMediaUrl(this.env.PUBLIC_MEDIA_BASE_URL, value)
         : null;
 
-    // The storage key is dropped rather than passed on: the client is given a
+    const avatarUrl = toUrl(row['avatar_storage_key']);
+    const coverUrl = toUrl(row['cover_storage_key']);
+
+    // The storage keys are dropped rather than passed on: the client is given a
     // URL it can render, and an R2 key is an implementation detail that has no
     // business travelling to a browser.
-    const { avatar_storage_key: _unused, ...rest } = row;
-    return { ...rest, skills, interests, avatar_url: avatarUrl };
+    const { avatar_storage_key: _a, cover_storage_key: _c, ...rest } = row;
+    return { ...rest, skills, interests, avatar_url: avatarUrl, cover_url: coverUrl };
   }
 
   // -------------------------------------------------------------------------
@@ -518,7 +520,10 @@ export class MembershipService {
 
   // -------------------------------------------------------------------------
 
-  private async requireOwnProfile(user: AuthenticatedUser): Promise<MemberProfileRecord> {
+  /// Public so a controller acting for the member — setting their own
+  /// portrait, say — can resolve the profile without duplicating the lookup and
+  /// the "you have no profile yet" error alongside it.
+  async requireOwnProfile(user: AuthenticatedUser): Promise<MemberProfileRecord> {
     const profile = await this.members.findByUserId(user.id);
     if (!profile) {
       throw new NotFoundError(

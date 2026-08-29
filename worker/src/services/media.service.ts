@@ -42,11 +42,24 @@ export class MediaService {
   async upload(
     request: Request,
     actor: AuthenticatedUser | null,
-    options: { defaultStatus?: string } = {},
+    options: {
+      defaultStatus?: string;
+      /**
+       * Ignore whatever folder the client asked for and use this one.
+       *
+       * The folder normally comes from the form, which is fine for an editor
+       * with `media:create` — they may write anywhere. It is not fine for an
+       * endpoint an ordinary member can reach: without this, a member updating
+       * their own portrait could name any folder in the archive and write to
+       * it. The caller that trusts its user passes nothing; the caller that
+       * does not passes the one folder it means.
+       */
+      forceFolder?: R2Folder;
+    } = {},
   ): Promise<{ id: string; storageKey: string; url: string; sizeBytes: number; mimeType: string }> {
     const form = await request.formData();
     const file = form.get('file');
-    const folderValue = String(form.get('folder') ?? '');
+    const folderValue = options.forceFolder ?? String(form.get('folder') ?? '');
 
     if (!(file instanceof File)) {
       throw new BadRequestError('No file was included in the upload.');

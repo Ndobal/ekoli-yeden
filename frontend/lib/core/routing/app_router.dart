@@ -335,7 +335,7 @@ GoRouter buildRouter(AuthController auth) {
       ),
       GoRoute(
         path: AppRoutes.events,
-        builder: (_, _) => const EventsListPage(),
+        builder: (_, _) => const NewsPortalPage(initialTab: NewsTab.events),
         routes: <RouteBase>[
           GoRoute(
             path: ':slug',

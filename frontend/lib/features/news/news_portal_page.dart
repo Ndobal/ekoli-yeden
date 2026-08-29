@@ -18,6 +18,7 @@ import '../../core/widgets/seo_head.dart';
 import '../../core/widgets/state_views.dart';
 import '../../models/news.dart';
 import '../../repositories/news_portal_repository.dart';
+import '../events/events_pages.dart' show EventsBrowser;
 import '../../services/api/api_response.dart';
 import '../community/community_pages.dart' show CommunityProjectsBrowser;
 
@@ -56,7 +57,13 @@ class NewsPortalPage extends StatefulWidget {
 }
 
 /// The two halves of the section.
-enum NewsTab { news, projects }
+/// WHAT IS HAPPENING IN EKOLI-YEDEN, IN THREE ANSWERS.
+///
+/// News is what has been announced, Events is when things are, and Community
+/// projects is what is being built. They were three sections in the navigation
+/// answering one question, so somebody looking for a meeting found the
+/// announcement about it in a different place from the date of it.
+enum NewsTab { news, events, projects }
 
 class _NewsPortalPageState extends State<NewsPortalPage> {
   final TextEditingController _search = TextEditingController();
@@ -122,6 +129,11 @@ class _NewsPortalPageState extends State<NewsPortalPage> {
                   icon: Icon(Icons.article_outlined, size: 18),
                 ),
                 ButtonSegment<NewsTab>(
+                  value: NewsTab.events,
+                  label: Text('Events'),
+                  icon: Icon(Icons.event_outlined, size: 18),
+                ),
+                ButtonSegment<NewsTab>(
                   value: NewsTab.projects,
                   label: Text('Community projects'),
                   icon: Icon(Icons.handshake_outlined, size: 18),
@@ -131,7 +143,9 @@ class _NewsPortalPageState extends State<NewsPortalPage> {
               onSelectionChanged: (Set<NewsTab> value) => setState(() => _tab = value.first),
             ),
             const Gap.xxl(),
-            if (_tab == NewsTab.projects)
+            if (_tab == NewsTab.events)
+              const EventsBrowser()
+            else if (_tab == NewsTab.projects)
               const CommunityProjectsBrowser()
             else
               _NewsTab(

@@ -434,7 +434,11 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
     path: AppRoutes.learn,
     description: 'Learn about Ekori — greetings, numbers and quizzes',
   ),
-  NavItem(label: 'News', path: AppRoutes.news, description: 'Community news and announcements'),
+  NavItem(
+    label: 'News',
+    path: AppRoutes.news,
+    description: 'Announcements, events and community projects',
+  ),
   NavItem(
     label: 'Gallery',
     path: AppRoutes.gallery,

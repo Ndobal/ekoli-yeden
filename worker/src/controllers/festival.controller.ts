@@ -9,6 +9,9 @@ import { CONTENT_STATUS } from '../types/models';
 import { NotFoundError } from '../utils/errors';
 import { json, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
 import { publicMediaUrl } from '../utils/files';
+import { UnauthorizedError } from '../utils/errors';
+import { readJsonBody, Validator } from '../utils/validation';
+import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
 
 /**
  * THE FESTIVAL SYSTEM
@@ -367,37 +370,47 @@ export async function ensureFestivalGallery(context: RequestContext): Promise<Re
 /**
  * `GET /api/admin/festival-galleries`
  *
- * Every festival with its album and a photograph count — the index the
- * workspace opens on, so a Media Team volunteer picks a year rather than
- * hunting for an album by name.
+ * Every festival with its years beneath it.
+ *
+ * It used to return one album per festival and create it on the way past,
+ * because a festival WAS a year. Since 0036 a festival is the permanent parent
+ * and a year is an album, so there is nothing to create here: a festival with
+ * no years yet is a perfectly ordinary state — somebody has recorded that
+ * Odagum exists and has not yet added a celebration of it.
  */
 export async function festivalGalleryIndex(context: RequestContext): Promise<Response> {
   const service = new GalleryService(context.env);
-  const { items: festivals } = await listRecords<Record<string, unknown>>(context.env.DB, 'festivals', {
-    sortColumn: 'year',
-    sortDirection: 'DESC',
-    limit: 100,
-    offset: 0,
-  });
+  const { items: festivals } = await listRecords<Record<string, unknown>>(
+    context.env.DB,
+    'festivals',
+    { sortColumn: 'sort_order', sortDirection: 'ASC', limit: 200, offset: 0 },
+  );
 
-  // Sequential rather than parallel: each iteration may create a gallery, and
-  // two concurrent creations for the same festival would race on the slug.
   const rows: Record<string, unknown>[] = [];
   for (const festival of festivals) {
-    const gallery = await ensureAlbumFor(service, festival);
-    const counts = await service.repo.countsForGallery(gallery.id);
+    const albums = await service.repo.albumsForFestival(String(festival['id']), [
+      'draft',
+      'pending_review',
+      'approved',
+      'published',
+      'archived',
+    ]);
 
     rows.push({
       festival_id: festival['id'],
       festival_name: festival['name'],
       festival_slug: festival['slug'],
       festival_status: festival['status'],
-      gallery_id: gallery.id,
-      gallery_slug: gallery.slug,
-      gallery_title: gallery.title,
-      gallery_status: gallery.status,
-      counts,
-      total: Object.values(counts).reduce((sum, value) => sum + value, 0),
+      short_description: festival['short_description'],
+      years: albums.map((album) => ({
+        gallery_id: album['id'],
+        gallery_slug: album['slug'],
+        gallery_title: album['title'],
+        gallery_status: album['status'],
+        year: album['year'],
+        photo_count: Number(album['photo_count'] ?? 0),
+        video_count: Number(album['video_count'] ?? 0),
+      })),
     });
   }
 
@@ -405,31 +418,110 @@ export async function festivalGalleryIndex(context: RequestContext): Promise<Res
 }
 
 /**
- * `POST /api/admin/festivals` — create an edition, and its album with it.
+ * `POST /api/admin/festivals` — a new festival.
+ *
+ * Odagum, Ekpirikum, and whatever else the community celebrates. The parent
+ * only: no album is created with it, because a festival that has just been
+ * recorded has no year yet and inventing one would put an empty "0" in the
+ * archive's timeline.
  *
  * Wraps the generated create handler rather than replacing it, so festivals
  * keep exactly the validation, versioning and audit behaviour every other
- * content type has. The only addition is the album, created in the same
- * request: a festival that exists without one is a festival whose photographs
- * have nowhere to go, and relying on somebody to remember afterwards is how
- * that ends up being nobody.
+ * content type has.
  */
 export async function createFestival(context: RequestContext): Promise<Response> {
-  const response = await adminCreate(FESTIVAL_RESOURCE)(context);
-  if (response.status !== 201) return response;
+  return adminCreate(FESTIVAL_RESOURCE)(context);
+}
 
-  // The body is read back rather than threaded through, so the generated
-  // handler stays the single definition of what creating a record means.
-  const cloned = response.clone();
-  const payload = (await cloned.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
-  const festival = payload?.data;
-  if (!festival || typeof festival['id'] !== 'string') return response;
+/**
+ * `POST /api/admin/festivals/:id/years`
+ *
+ * Adds a year to a festival: Leboku 2025, Leboku 2024.
+ *
+ * The album is an ordinary gallery carrying `festival_id` and `year`, which is
+ * what puts it in two places at once — the festival's own archive and the
+ * Gallery's list of albums — without a second record existing anywhere.
+ */
+export async function addFestivalYear(context: RequestContext): Promise<Response> {
+  const actor = context.user;
+  if (!actor) throw new UnauthorizedError('Please sign in to continue.');
+
+  const festivalId = context.params['id'] ?? '';
+  const festival = await findRecordBy<Record<string, unknown>>(
+    context.env.DB,
+    'festivals',
+    'id',
+    festivalId,
+  );
+  if (!festival) throw new NotFoundError('That festival was not found.');
+
+  const body = await readJsonBody(context.request);
+  const validated = new Validator(body)
+    .integer('year', { required: true, min: 1900, max: 2200, label: 'Year' })
+    .string('title', { max: 200, label: 'Album name' })
+    .string('description', { max: 4000, label: 'Description' })
+    .string('location', { max: 200, label: 'Where it was held' })
+    .string('event_date', { max: 40, label: 'Date' })
+    .validated();
+
+  const year = Number(validated['year']);
+  const name = String(festival['name'] ?? 'Festival');
+
+  // One album per festival-year. Asking twice is somebody pressing a button
+  // again, not a request for a duplicate.
+  const existing = await context.env.DB.prepare(
+    `SELECT "id", "slug" FROM "galleries" WHERE "festival_id" = ? AND "year" = ? LIMIT 1`,
+  )
+    .bind(festivalId, year)
+    .first<{ id: string; slug: string }>();
+
+  if (existing) {
+    return json(
+      { ...existing, year, created: false, message: `${name} ${year} already exists.` },
+      { headers: NO_STORE_HEADERS },
+    );
+  }
 
   const service = new GalleryService(context.env);
-  const gallery = await ensureAlbumFor(service, festival);
+  const title = (validated['title'] as string | null) ?? `${name} ${year}`;
+  const slug = await service.repo.uniqueSlug(
+    `${String(festival['slug'] ?? 'festival')}-${year}`,
+  );
+
+  const galleryId = await service.repo.createGallery({
+    slug,
+    title,
+    description: (validated['description'] as string | null) ?? null,
+    category: 'festival',
+    eventDate: (validated['event_date'] as string | null) ?? null,
+    location: (validated['location'] as string | null) ?? (festival['location'] as string | null) ?? null,
+    festivalId,
+    year,
+    isFestivalGallery: true,
+    // A new year starts as a draft. Publishing it is the act of saying the
+    // photographs in it are ready to be seen.
+    status: CONTENT_STATUS.DRAFT,
+  });
+
+  await new AuditRepository(context.env.DB).record({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: AUDIT_ACTIONS.CONTENT_CREATED,
+    resourceType: 'galleries',
+    resourceId: galleryId,
+    changes: { festivalId, year, title },
+    requestId: context.requestId,
+  });
 
   return json(
-    { ...festival, gallery_id: gallery.id, gallery_slug: gallery.slug },
+    {
+      id: galleryId,
+      slug,
+      title,
+      year,
+      created: true,
+      message: `${title} is ready. Add photographs and film to it, then publish it.`,
+    },
     { status: 201, headers: NO_STORE_HEADERS },
   );
 }

@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +10,7 @@ import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../services/api/mime_types.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_content.dart';
 import '../../core/widgets/cms_text.dart';
@@ -229,6 +233,15 @@ class _EditorState extends State<_Editor> {
           _ErrorBanner(message: _error!),
           const Gap.xl(),
         ],
+
+        // First, because it is the part of a profile people fill in first and
+        // the part that makes the rest feel worth filling in.
+        _ProfilePhotos(
+          avatarUrl: widget.profile.avatarUrl,
+          coverUrl: widget.profile.coverUrl,
+          name: widget.profile.name,
+        ),
+        const Gap.xxl(),
 
         // --- Who you are ---------------------------------------------------
         _Stage(
@@ -1173,5 +1186,210 @@ class _WhereInEkoriState extends State<_WhereInEkori> {
         ),
       ],
     );
+  }
+}
+
+/// YOUR PICTURE, AND THE BAND BEHIND IT.
+///
+/// `avatar_media_id` has been a writable column on a profile since the
+/// membership module was built, and there was no way for the profile's owner to
+/// fill it — the media library needs a permission an ordinary member does not
+/// have and should not be given. So the field existed and the person it
+/// belonged to could not use it.
+///
+/// Both go to the avatars folder, which is the one place `ALLOWED_MIME_TYPES`
+/// restricts to stills and the only folder every signed-in member can write to.
+class _ProfilePhotos extends StatefulWidget {
+  const _ProfilePhotos({
+    required this.avatarUrl,
+    required this.coverUrl,
+    required this.name,
+  });
+
+  final String? avatarUrl;
+  final String? coverUrl;
+  final String name;
+
+  @override
+  State<_ProfilePhotos> createState() => _ProfilePhotosState();
+}
+
+class _ProfilePhotosState extends State<_ProfilePhotos> {
+  late String? _avatar = widget.avatarUrl;
+  late String? _cover = widget.coverUrl;
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _pick({required bool isCover}) async {
+    final FilePickerResult? picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: UploadExtensions.images,
+      withData: true,
+    );
+    final PlatformFile? file = picked?.files.singleOrNull;
+    final Uint8List? bytes = file?.bytes;
+    if (file == null || bytes == null) return;
+
+    if (!mounted) return;
+    final MemberRepository repository = context.read<MemberRepository>();
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final String? url = await repository.uploadProfilePhoto(
+            bytes: bytes,
+            filename: file.name,
+            isCover: isCover,
+          );
+      if (!mounted) return;
+      setState(() {
+        if (isCover) {
+          _cover = url;
+        } else {
+          _avatar = url;
+        }
+      });
+    } on AppException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _remove({required bool isCover}) async {
+    setState(() => _busy = true);
+    try {
+      await context.read<MemberRepository>().removeProfilePhoto(isCover: isCover);
+      if (!mounted) return;
+      setState(() {
+        if (isCover) {
+          _cover = null;
+        } else {
+          _avatar = null;
+        }
+      });
+    } on AppException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Your picture', style: theme.textTheme.titleMedium),
+        const Gap.xs(),
+        Text(
+          'A photograph of you, and a wider image for the band behind it. Both are optional, '
+          'and both are visible to anybody who can see your profile.',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const Gap.lg(),
+
+        // The cover, with the portrait sitting on it — the same arrangement as
+        // the profile itself, so what somebody is setting up is what they see.
+        Stack(
+          clipBehavior: Clip.none,
+          children: <Widget>[
+            AspectRatio(
+              aspectRatio: 3.4,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: AppRadius.mdAll,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  image: _cover == null
+                      ? null
+                      : DecorationImage(image: NetworkImage(_cover!), fit: BoxFit.cover),
+                ),
+                alignment: Alignment.center,
+                child: _cover != null
+                    ? null
+                    : Text(
+                        'No cover image',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+              ),
+            ),
+            Positioned(
+              left: AppSpacing.lg,
+              bottom: -28,
+              child: Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.navy,
+                  border: Border.all(color: theme.colorScheme.surface, width: 3),
+                  image: _avatar == null
+                      ? null
+                      : DecorationImage(image: NetworkImage(_avatar!), fit: BoxFit.cover),
+                ),
+                alignment: Alignment.center,
+                child: _avatar != null
+                    ? null
+                    : Text(
+                        _initials(widget.name),
+                        style: theme.textTheme.titleLarge?.copyWith(color: Colors.white),
+                      ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 40),
+
+        if (_error != null) ...<Widget>[
+          Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+          const Gap.sm(),
+        ],
+
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _pick(isCover: false),
+              icon: const Icon(Icons.person_outline, size: 18),
+              label: Text(_avatar == null ? 'Add your picture' : 'Change your picture'),
+            ),
+            if (_avatar != null)
+              TextButton(
+                onPressed: _busy ? null : () => _remove(isCover: false),
+                child: const Text('Remove picture'),
+              ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _pick(isCover: true),
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: Text(_cover == null ? 'Add a cover image' : 'Change cover image'),
+            ),
+            if (_cover != null)
+              TextButton(
+                onPressed: _busy ? null : () => _remove(isCover: true),
+                child: const Text('Remove cover'),
+              ),
+          ],
+        ),
+        if (_busy) ...<Widget>[
+          const Gap.md(),
+          const LinearProgressIndicator(minHeight: 3),
+        ],
+      ],
+    );
+  }
+
+  static String _initials(String name) {
+    final List<String> parts =
+        name.trim().split(RegExp(r'\s+')).where((String p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    return parts.take(2).map((String p) => p[0].toUpperCase()).join();
   }
 }

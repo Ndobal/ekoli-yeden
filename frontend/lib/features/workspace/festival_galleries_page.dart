@@ -78,38 +78,48 @@ class _FestivalGalleriesPageState extends State<FestivalGalleriesPage> {
           ),
           const Gap.xxl(),
           if (_notice != null) ...<Widget>[
-            _Notice(message: _notice!),
+            _NoticeBanner(message: _notice!),
             const Gap.xl(),
           ],
-          AsyncContent<List<FestivalAlbum>>(
+          AsyncContent<List<FestivalWithYears>>(
             key: ValueKey<int>(_reloads),
             load: repository.festivalAlbums,
-            loadingMessage: 'Opening the festival albums…',
-            isEmpty: (List<FestivalAlbum> albums) => albums.isEmpty,
-            emptyBuilder: (BuildContext context) => const EmptyView(
-              icon: Icons.celebration_outlined,
-              title: 'No festivals yet',
-              message:
-                  'Create a festival edition first. Its photograph album is created with it, so '
-                  'the pictures always have a year to belong to.',
-              showContributeAction: false,
+            loadingMessage: 'Opening the festivals…',
+            isEmpty: (List<FestivalWithYears> items) => items.isEmpty,
+            emptyBuilder: (BuildContext context) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const EmptyView(
+                  icon: Icons.celebration_outlined,
+                  title: 'No festivals recorded yet',
+                  message:
+                      'Record a festival first — Leboku, Odagum, Ekpirikum — and then add a year '
+                      'to it for each celebration you have photographs of.',
+                  showContributeAction: false,
+                ),
+                const Gap.lg(),
+                FilledButton.icon(
+                  onPressed: _createFestival,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Record a festival'),
+                ),
+              ],
             ),
-            builder: (BuildContext context, List<FestivalAlbum> albums) {
+            builder: (BuildContext context, List<FestivalWithYears> festivals) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: albums
-                    .map(
-                      (FestivalAlbum album) => _AlbumRow(
-                        album: album,
-                        expanded: _openAlbumId == album.galleryId,
-                        onToggle: () => setState(
-                          () => _openAlbumId =
-                              _openAlbumId == album.galleryId ? null : album.galleryId,
-                        ),
-                        onChanged: _reload,
+                children: <Widget>[
+                  for (final FestivalWithYears festival in festivals)
+                    _FestivalBlock(
+                      festival: festival,
+                      openAlbumId: _openAlbumId,
+                      onToggleAlbum: (String id) => setState(
+                        () => _openAlbumId = _openAlbumId == id ? null : id,
                       ),
-                    )
-                    .toList(growable: false),
+                      onAddYear: () => _addYear(festival),
+                      onChanged: _reload,
+                    ),
+                ],
               );
             },
           ),
@@ -117,10 +127,307 @@ class _FestivalGalleriesPageState extends State<FestivalGalleriesPage> {
       ),
     );
   }
+
+  /// Records a festival. The parent only — a festival just recorded has no
+  /// year yet, and inventing one would put an empty year in the timeline.
+  Future<void> _createFestival() async {
+    final _NewFestival? result = await showDialog<_NewFestival>(
+      context: context,
+      builder: (BuildContext context) => const _NewFestivalDialog(),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      await context.read<GalleryRepository>().createFestival(
+            name: result.name,
+            shortDescription: result.shortDescription,
+            usuallyCelebrated: result.usuallyCelebrated,
+          );
+      _reload('${result.name} is recorded. Add a year to it when you have photographs.');
+    } on AppException catch (error) {
+      if (mounted) setState(() => _notice = error.message);
+    }
+  }
+
+  /// Adds a year to an existing festival.
+  Future<void> _addYear(FestivalWithYears festival) async {
+    final int? year = await showDialog<int>(
+      context: context,
+      builder: (BuildContext context) => _AddYearDialog(festival: festival),
+    );
+    if (year == null || !mounted) return;
+
+    try {
+      final String message = await context.read<GalleryRepository>().addFestivalYear(
+            festivalId: festival.festivalId,
+            year: year,
+          );
+      _reload(message);
+    } on AppException catch (error) {
+      if (mounted) setState(() => _notice = error.message);
+    }
+  }
 }
 
-class _Notice extends StatelessWidget {
-  const _Notice({required this.message});
+/// One festival, with its years under it.
+class _FestivalBlock extends StatelessWidget {
+  const _FestivalBlock({
+    required this.festival,
+    required this.openAlbumId,
+    required this.onToggleAlbum,
+    required this.onAddYear,
+    required this.onChanged,
+  });
+
+  final FestivalWithYears festival;
+  final String? openAlbumId;
+  final ValueChanged<String> onToggleAlbum;
+  final VoidCallback onAddYear;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(festival.festivalName, style: theme.textTheme.titleLarge),
+                    if ((festival.shortDescription ?? '').isNotEmpty)
+                      Text(
+                        festival.shortDescription!,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: onAddYear,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add a year'),
+              ),
+            ],
+          ),
+          const Gap.md(),
+          if (festival.years.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.mdAll,
+              ),
+              child: Text(
+                'No years recorded yet. Add one for each celebration you have photographs or '
+                'film of — they will appear on the festival page and in the Gallery.',
+                style: theme.textTheme.bodySmall,
+              ),
+            )
+          else
+            for (final FestivalYear year in festival.years)
+              _AlbumRow(
+                festivalName: festival.festivalName,
+                year: year,
+                expanded: openAlbumId == year.galleryId,
+                onToggle: () => onToggleAlbum(year.galleryId),
+                onChanged: onChanged,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the "record a festival" dialog collects.
+class _NewFestival {
+  const _NewFestival({
+    required this.name,
+    this.shortDescription,
+    this.usuallyCelebrated,
+  });
+
+  final String name;
+  final String? shortDescription;
+  final String? usuallyCelebrated;
+}
+
+class _NewFestivalDialog extends StatefulWidget {
+  const _NewFestivalDialog();
+
+  @override
+  State<_NewFestivalDialog> createState() => _NewFestivalDialogState();
+}
+
+class _NewFestivalDialogState extends State<_NewFestivalDialog> {
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _short = TextEditingController();
+  final TextEditingController _when = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _short.dispose();
+    _when.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Record a festival'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'The festival itself, not one year of it. Its history and significance can be '
+              'written in full afterwards; the years are added one at a time.',
+            ),
+            const Gap.lg(),
+            TextField(
+              controller: _name,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'Leboku, Odagum, Ekpirikum',
+              ),
+            ),
+            const Gap.md(),
+            TextField(
+              controller: _short,
+              maxLength: 300,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'In one line',
+                hintText: 'What somebody should know about it at a glance',
+              ),
+            ),
+            const Gap.md(),
+            TextField(
+              controller: _when,
+              decoration: const InputDecoration(
+                labelText: 'When it is usually celebrated',
+                hintText: 'The last week of August, after the yam harvest',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final String name = _name.text.trim();
+            if (name.isEmpty) return;
+            Navigator.of(context).pop(
+              _NewFestival(
+                name: name,
+                shortDescription: _short.text.trim().isEmpty ? null : _short.text.trim(),
+                usuallyCelebrated: _when.text.trim().isEmpty ? null : _when.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Record it'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddYearDialog extends StatefulWidget {
+  const _AddYearDialog({required this.festival});
+
+  final FestivalWithYears festival;
+
+  @override
+  State<_AddYearDialog> createState() => _AddYearDialogState();
+}
+
+class _AddYearDialogState extends State<_AddYearDialog> {
+  late final TextEditingController _year =
+      TextEditingController(text: DateTime.now().year.toString());
+  String? _error;
+
+  @override
+  void dispose() {
+    _year.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Add a year to ${widget.festival.festivalName}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'An album for that year’s celebration. It appears on the festival page and in '
+            'the Gallery — one album, both places, so a photograph added in either is in '
+            'both.',
+          ),
+          const Gap.lg(),
+          TextField(
+            controller: _year,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Year',
+              errorText: _error,
+            ),
+          ),
+          if (widget.festival.recordedYears.isNotEmpty) ...<Widget>[
+            const Gap.md(),
+            Text(
+              'Already recorded: ${(widget.festival.recordedYears.toList()..sort()).reversed.join(', ')}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final int? year = int.tryParse(_year.text.trim());
+            if (year == null || year < 1900 || year > 2200) {
+              setState(() => _error = 'Give a year between 1900 and 2200.');
+              return;
+            }
+            if (widget.festival.recordedYears.contains(year)) {
+              setState(() => _error = 'That year is already recorded.');
+              return;
+            }
+            Navigator.of(context).pop(year);
+          },
+          child: const Text('Add the year'),
+        ),
+      ],
+    );
+  }
+}
+
+/// What just happened, said once above the list.
+class _NoticeBanner extends StatelessWidget {
+  const _NoticeBanner({required this.message});
 
   final String message;
 
@@ -130,29 +437,37 @@ class _Notice extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.green.withValues(alpha: 0.08),
-        borderRadius: AppRadius.smAll,
-        border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
+        color: AppColors.green.withValues(alpha: 0.10),
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
       ),
-      child: Text(message, style: theme.textTheme.bodyMedium),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.check_circle_outline, size: 18, color: AppColors.greenDark),
+          const Gap.hMd(),
+          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
+        ],
+      ),
     );
   }
 }
 
 class _AlbumRow extends StatelessWidget {
   const _AlbumRow({
-    required this.album,
+    required this.festivalName,
+    required this.year,
     required this.expanded,
     required this.onToggle,
     required this.onChanged,
   });
 
-  final FestivalAlbum album;
+  final String festivalName;
+  final FestivalYear year;
   final bool expanded;
   final VoidCallback onToggle;
-  final void Function([String? notice]) onChanged;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -186,25 +501,26 @@ class _AlbumRow extends StatelessWidget {
                       children: <Widget>[
                         Row(
                           children: <Widget>[
-                            Text(album.displayName, style: theme.textTheme.titleMedium),
+                            Text(
+                              year.year == null
+                                  ? year.galleryTitle
+                                  : '$festivalName ${year.year}',
+                              style: theme.textTheme.titleMedium,
+                            ),
                             const Gap.hMd(),
-                            StatusBadge(album.galleryStatus),
+                            StatusBadge(year.galleryStatus),
                           ],
                         ),
                         const Gap.xs(),
                         Text(
-                          album.total == 0
-                              ? 'No photographs yet'
-                              : album.awaiting == 0
-                                  ? '${album.total} photographs, all published'
-                                  : '${album.total} photographs · ${album.awaiting} not yet published',
+                          year.holdings,
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
                   FilledButton.icon(
-                    onPressed: () => _upload(context, album, onChanged),
+                    onPressed: () => _upload(context, year, onChanged),
                     icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                     label: const Text('Add photographs or video'),
                   ),
@@ -220,7 +536,7 @@ class _AlbumRow extends StatelessWidget {
                 AppSpacing.lg,
                 AppSpacing.lg,
               ),
-              child: _AlbumContents(album: album, onChanged: onChanged),
+              child: _AlbumContents(year: year, onChanged: onChanged),
             ),
         ],
       ),
@@ -229,10 +545,10 @@ class _AlbumRow extends StatelessWidget {
 }
 
 class _AlbumContents extends StatelessWidget {
-  const _AlbumContents({required this.album, required this.onChanged});
+  const _AlbumContents({required this.year, required this.onChanged});
 
-  final FestivalAlbum album;
-  final void Function([String? notice]) onChanged;
+  final FestivalYear year;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +556,7 @@ class _AlbumContents extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
 
     return AsyncContent<({Gallery gallery, List<Photograph> items, Map<String, int> counts})>(
-      load: () => repository.manage(album.galleryId),
+      load: () => repository.manage(year.galleryId),
       loadingMessage: 'Opening the album…',
       builder: (
         BuildContext context,
@@ -249,7 +565,7 @@ class _AlbumContents extends StatelessWidget {
         if (data.items.isEmpty) {
           return Text(
             'Nothing in this album yet. Photographs added here are filed under '
-            '${album.displayName} and appear in the main Gallery as well.',
+            '${year.galleryTitle} and appear in the main Gallery as well.',
             style: theme.textTheme.bodySmall,
           );
         }
@@ -354,8 +670,8 @@ class _AlbumContents extends StatelessWidget {
 
 Future<void> _upload(
   BuildContext context,
-  FestivalAlbum album,
-  void Function([String? notice]) onChanged,
+  FestivalYear year,
+  ValueChanged<String> onChanged,
 ) async {
   final FilePickerResult? picked = await FilePicker.pickFiles(
     allowMultiple: true,
@@ -377,7 +693,7 @@ Future<void> _upload(
     if (bytes == null) continue;
     try {
       await repository.uploadIntoAlbum(
-        galleryId: album.galleryId,
+        galleryId: year.galleryId,
         bytes: bytes,
         filename: file.name,
         folder: MediaFolders.leboku,
@@ -393,7 +709,7 @@ Future<void> _upload(
   onChanged(
     firstError != null
         ? '$uploaded of ${picked.files.length} uploaded. $firstError'
-        : '$uploaded file${uploaded == 1 ? '' : 's'} added to ${album.displayName}. They are in '
+        : '$uploaded file${uploaded == 1 ? '' : 's'} added to ${year.galleryTitle}. They are in '
             'the main Gallery too. Describe and date each one so it can still be found in fifty '
             'years.',
   );
@@ -419,7 +735,7 @@ Future<void> _upload(
 Future<void> _label(
   BuildContext context,
   Photograph photograph,
-  void Function([String? notice]) onChanged,
+  ValueChanged<String> onChanged,
 ) async {
   final TextEditingController caption = TextEditingController(text: photograph.caption ?? '');
   final TextEditingController people =
@@ -553,7 +869,7 @@ class _TakenAtField extends StatelessWidget {
 Future<void> _remove(
   BuildContext context,
   Photograph photograph,
-  void Function([String? notice]) onChanged,
+  ValueChanged<String> onChanged,
 ) async {
   final bool confirmed = await showDialog<bool>(
         context: context,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../core/config/app_config.dart';
 import '../models/content_status.dart';
 import '../models/member.dart';
@@ -189,6 +191,29 @@ class MemberRepository {
       },
     );
   }
+
+  /// Sets your own portrait, or the band behind it.
+  ///
+  /// Goes to the avatars folder and to your own profile row and nowhere else —
+  /// which is what lets an ordinary member do this without a media permission.
+  /// The server ignores any folder the client names.
+  Future<String?> uploadProfilePhoto({
+    required Uint8List bytes,
+    required String filename,
+    required bool isCover,
+  }) async {
+    final Map<String, dynamic> data = await _api.upload(
+      path: '/api/membership/me/photo?kind=${isCover ? 'cover' : 'avatar'}',
+      bytes: bytes,
+      filename: filename,
+      folder: 'avatars',
+    );
+    return data['url'] as String?;
+  }
+
+  /// Takes the picture off the profile. The file itself stays in the archive.
+  Future<void> removeProfilePhoto({required bool isCover}) =>
+      _api.delete('/api/membership/me/photo?kind=${isCover ? 'cover' : 'avatar'}');
 
   /// The professions and countries that actually have somebody behind them.
   ///
