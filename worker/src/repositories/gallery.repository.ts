@@ -145,6 +145,7 @@ export class GalleryRepository {
       .prepare(
         `SELECT g."id", g."slug", g."title", g."description", g."category",
                 g."event_date", g."location", g."festival_id", g."is_festival_gallery",
+                g."year", f."name" AS festival_name, f."slug" AS festival_slug,
                 COUNT(gi."id") AS item_count,
                 SUM(CASE WHEN ma."mime_type" LIKE 'video/%' THEN 1 ELSE 0 END) AS video_count
          FROM "galleries" g
@@ -152,9 +153,12 @@ export class GalleryRepository {
                 ON gi."gallery_id" = g."id" AND gi."status" = 'published'
          LEFT JOIN "media_assets" ma
                 ON ma."id" = gi."media_asset_id" AND ma."status" = 'published'
+         LEFT JOIN "festivals" f
+                ON f."id" = g."festival_id" AND f."status" = 'published'
          WHERE g."status" = 'published'
          GROUP BY g."id"
          ORDER BY g."is_festival_gallery" DESC,
+                  g."year" IS NULL, g."year" DESC,
                   g."event_date" IS NULL, g."event_date" DESC,
                   g."sort_order" ASC, g."title" ASC`,
       )
@@ -169,6 +173,12 @@ export class GalleryRepository {
       event_date: (row['event_date'] as string | null) ?? null,
       location: (row['location'] as string | null) ?? null,
       festival_id: (row['festival_id'] as string | null) ?? null,
+      // The festival's own name and slug, so the Gallery can offer "Leboku" as
+      // a filter without a second request — and so an album reads as
+      // "Leboku · 2026" rather than relying on whatever it was titled.
+      festival_name: (row['festival_name'] as string | null) ?? null,
+      festival_slug: (row['festival_slug'] as string | null) ?? null,
+      year: row['year'] == null ? null : Number(row['year']),
       is_festival_gallery: Number(row['is_festival_gallery'] ?? 0),
       item_count: Number(row['item_count'] ?? 0),
       video_count: Number(row['video_count'] ?? 0),

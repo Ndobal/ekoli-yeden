@@ -166,7 +166,7 @@ class _GalleryListPageState extends State<GalleryListPage> {
 /// The albums are still here, because "show me Leboku 2026" is a real question.
 /// They are a row of filters now, and the pictures are underneath them, where
 /// somebody arriving at a gallery expects to find them.
-class _AlbumFilterBar extends StatelessWidget {
+class _AlbumFilterBar extends StatefulWidget {
   const _AlbumFilterBar({
     required this.albums,
     required this.selected,
@@ -176,6 +176,27 @@ class _AlbumFilterBar extends StatelessWidget {
   final List<AlbumSummary> albums;
   final AlbumSummary? selected;
   final ValueChanged<AlbumSummary?> onChanged;
+
+  @override
+  State<_AlbumFilterBar> createState() => _AlbumFilterBarState();
+}
+
+class _AlbumFilterBarState extends State<_AlbumFilterBar> {
+  /// The kind of album being shown, or null for all of them.
+  String? _filter;
+
+  List<AlbumSummary> get albums => widget.albums;
+  AlbumSummary? get selected => widget.selected;
+  ValueChanged<AlbumSummary?> get onChanged => widget.onChanged;
+
+  /// Narrowing the kind clears the chosen album, because the album that was
+  /// selected is usually not in the new set — and showing its pictures under a
+  /// filter that excludes it is the kind of thing that makes people stop
+  /// trusting filters.
+  void _select(String? filter) {
+    setState(() => _filter = filter);
+    if (selected != null) onChanged(null);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -189,11 +210,76 @@ class _AlbumFilterBar extends StatelessWidget {
 
     if (filled.isEmpty) return const SizedBox.shrink();
 
-    final int total = filled.fold<int>(0, (int sum, AlbumSummary a) => sum + a.itemCount);
+    // TWO LAYERS, BECAUSE THERE ARE TWO QUESTIONS.
+    //
+    // "Show me festivals" and "show me Leboku 2026" are different sizes of
+    // question, and one row of chips holding both gets long and unreadable the
+    // moment a second festival exists. So the first row narrows by KIND, and
+    // the albums below it are only the ones that kind contains.
+    //
+    // Each festival appears as its own filter, taken from `festival_name`
+    // rather than from a category — a festival is a record, not a label, and
+    // the two would disagree the first time somebody retitled an album.
+    final List<String> festivals = <String>{
+      for (final AlbumSummary album in filled)
+        if ((album.festivalName ?? '').isNotEmpty) album.festivalName!,
+    }.toList()
+      ..sort();
+
+    final List<String> categories = <String>{
+      for (final AlbumSummary album in filled)
+        if ((album.category ?? '').isNotEmpty && album.category != 'festival') album.category!,
+    }.toList()
+      ..sort();
+
+    bool matchesFilter(AlbumSummary album) {
+      if (_filter == null) return true;
+      if (_filter == _kFestivals) return album.festivalId != null;
+      if (_filter!.startsWith(_kFestivalPrefix)) {
+        return album.festivalName == _filter!.substring(_kFestivalPrefix.length);
+      }
+      return album.category == _filter;
+    }
+
+    final List<AlbumSummary> visible =
+        filled.where(matchesFilter).toList(growable: false);
+    final int total = visible.fold<int>(0, (int sum, AlbumSummary a) => sum + a.itemCount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            _FilterChip(
+              label: 'All',
+              selected: _filter == null,
+              onSelected: () => _select(null),
+            ),
+            if (festivals.isNotEmpty)
+              _FilterChip(
+                label: 'Festivals',
+                icon: Icons.celebration_outlined,
+                selected: _filter == _kFestivals,
+                onSelected: () => _select(_kFestivals),
+              ),
+            // Each festival by name, so "Leboku" is one press.
+            for (final String festival in festivals)
+              _FilterChip(
+                label: festival,
+                selected: _filter == '$_kFestivalPrefix$festival',
+                onSelected: () => _select('$_kFestivalPrefix$festival'),
+              ),
+            for (final String category in categories)
+              _FilterChip(
+                label: _categoryLabel(category),
+                selected: _filter == category,
+                onSelected: () => _select(category),
+              ),
+          ],
+        ),
+        const Gap.lg(),
         Text('Albums', style: theme.textTheme.labelLarge),
         const Gap.sm(),
         Wrap(
@@ -206,13 +292,15 @@ class _AlbumFilterBar extends StatelessWidget {
               selected: selected == null,
               onSelected: () => onChanged(null),
             ),
-            ...filled.map(
+            ...visible.map(
               (AlbumSummary album) => _AlbumChip(
-                label: album.title,
+                // "Leboku · 2026" reads better than whatever the album happens
+                // to be titled, and stays right if somebody retitles it.
+                label: album.festivalName != null && album.year != null
+                    ? '${album.festivalName} · ${album.year}'
+                    : album.title,
                 count: album.itemCount,
                 videoCount: album.videoCount,
-                // A festival year is marked: those are the albums a visitor
-                // most often arrives looking for.
                 icon: album.isFestivalGallery ? Icons.celebration_outlined : null,
                 selected: selected?.id == album.id,
                 onSelected: () => onChanged(album),
@@ -221,6 +309,49 @@ class _AlbumFilterBar extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Sentinels for the two filters that are not plain categories.
+const String _kFestivals = ' festivals';
+const String _kFestivalPrefix = ' festival:';
+
+String _categoryLabel(String category) => switch (category) {
+  'community' => 'Community',
+  'event' => 'Events',
+  'leadership' => 'Leadership',
+  'historical' => 'Historical',
+  'people' => 'People',
+  'places' => 'Places',
+  'culture' => 'Culture',
+  _ => category.isEmpty
+      ? 'Other'
+      : '${category[0].toUpperCase()}${category.substring(1)}',
+};
+
+/// A filter chip in the top row.
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+    this.icon,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      avatar: icon == null ? null : Icon(icon, size: 15),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onSelected(),
     );
   }
 }

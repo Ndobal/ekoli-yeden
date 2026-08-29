@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/video/archive_video.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/formatters.dart';
@@ -476,6 +477,30 @@ class _FestivalPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                // Every year first, then this year's photographs beneath it.
+                // The archive is the point of the page; the latest celebration
+                // is one row of it.
+                if (detail.albums.isNotEmpty) ...<Widget>[
+                  const CmsText(
+                    'page.festivals.archive_title',
+                    fallback: 'Festival Archive',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+                  ),
+                  const Gap.sm(),
+                  const CmsText(
+                    'page.festivals.archive_intro',
+                    fallback:
+                        'Every celebration the archive holds, year by year. Each year has its '
+                        'own album of photographs and film.',
+                    style: TextStyle(height: 1.6),
+                  ),
+                  const Gap.lg(),
+                  _FestivalArchive(
+                    albums: detail.albums,
+                    festivalName: festival.displayName,
+                  ),
+                  const Gap.xxl(),
+                ],
                 if (detail.gallery.isEmpty)
                   const AwaitingMaterialNote(
                     message:
@@ -904,6 +929,122 @@ class _EntryList extends StatelessWidget {
   }
 }
 
+/// THE FESTIVAL ARCHIVE — every year, newest first.
+///
+/// This is the part that makes a festival page a heritage record rather than a
+/// page about the most recent celebration. 2026, 2025, 2024, and in twenty
+/// years' time the same page still answers "what did Leboku look like when my
+/// mother was a girl".
+///
+/// Each row is an ordinary gallery, so opening one lands in the Gallery
+/// section on the same record these counts came from. Nothing is duplicated.
+class _FestivalArchive extends StatelessWidget {
+  const _FestivalArchive({required this.albums, required this.festivalName});
+
+  final List<FestivalAlbum> albums;
+  final String festivalName;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    if (albums.isEmpty) {
+      return const CmsText(
+        'page.festivals.no_years',
+        fallback:
+            'No celebrations have been recorded for this festival yet. When photographs and '
+            'film from a year are added, that year appears here.',
+        style: TextStyle(height: 1.6),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final FestivalAlbum album in albums)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Material(
+              color: theme.colorScheme.surface,
+              borderRadius: AppRadius.mdAll,
+              child: InkWell(
+                borderRadius: AppRadius.mdAll,
+                onTap: () => context.go(AppRoutes.galleryAlbum(album.slug)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadius.mdAll,
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      // The year, set large — it is what somebody is scanning
+                      // for, and a column of years reads as a timeline.
+                      Container(
+                        width: 104,
+                        color: AppColors.navy,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                        child: Text(
+                          album.year?.toString() ?? '—',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(album.title, style: theme.textTheme.titleMedium),
+                              const SizedBox(height: 2),
+                              Text(
+                                album.location == null || album.location!.isEmpty
+                                    ? album.holdings
+                                    : '${album.holdings} · ${album.location}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.lg),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// THE PHOTOGRAPHS AND FILM OF ONE FESTIVAL YEAR.
+///
+/// Every item used to be drawn with `ArchiveImage`, film included — so a video
+/// uploaded to a festival album arrived as a broken tile, which from the other
+/// side of the screen looks exactly like not being able to add video at all.
+///
+/// A festival album is an ordinary gallery and has always been allowed to hold
+/// both; the Worker accepts mp4, mov, webm and 3gp, and the main Gallery has
+/// rendered them for as long as it has existed. Only this grid did not.
 class _FestivalGallery extends StatelessWidget {
   const _FestivalGallery({required this.items});
 
@@ -911,37 +1052,107 @@ class _FestivalGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
     return ResponsiveCardGrid(
       maxColumns: 4,
       spacing: AppSpacing.md,
-      children: items.map((Map<String, dynamic> item) {
-        final String url = (item['url'] ?? '').toString();
-        final String label =
-            (item['caption'] ?? item['alt_text'] ?? 'An unlabelled photograph from the archive')
-                .toString();
+      children: items
+          .map((Map<String, dynamic> item) => _FestivalGalleryTile(item: item))
+          .toList(growable: false),
+    );
+  }
+}
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: AppRadius.smAll,
-              child: ArchiveImage(url: url, label: label, aspectRatio: 1),
-            ),
-            if (item['caption'] != null) ...<Widget>[
-              const Gap.sm(),
+class _FestivalGalleryTile extends StatefulWidget {
+  const _FestivalGalleryTile({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  State<_FestivalGalleryTile> createState() => _FestivalGalleryTileState();
+}
+
+class _FestivalGalleryTileState extends State<_FestivalGalleryTile> {
+  bool _playing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final Map<String, dynamic> item = widget.item;
+
+    final String url = (item['url'] ?? '').toString();
+    final String? caption = item['caption']?.toString();
+    final String label =
+        (caption ?? item['alt_text'] ?? 'An unlabelled photograph from the archive').toString();
+    final bool isVideo = (item['mime_type'] ?? '').toString().startsWith('video/');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        ClipRRect(
+          borderRadius: AppRadius.smAll,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: !isVideo
+                ? ArchiveImage(url: url, label: label, aspectRatio: 1)
+                : _playing && ArchiveVideo.isSupported
+                    ? ArchiveVideo.player(url)
+                    : _FilmTile(
+                        label: label,
+                        onPlay: ArchiveVideo.isSupported
+                            ? () => setState(() => _playing = true)
+                            : null,
+                      ),
+          ),
+        ),
+        if (caption != null) ...<Widget>[
+          const Gap.sm(),
+          Text(
+            caption,
+            style: theme.textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A film before it is playing. Nothing is fetched until somebody asks.
+class _FilmTile extends StatelessWidget {
+  const _FilmTile({required this.label, required this.onPlay});
+
+  final String label;
+  final VoidCallback? onPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Semantics(
+      label: label,
+      button: onPlay != null,
+      child: Material(
+        color: AppColors.navyDark,
+        child: InkWell(
+          onTap: onPlay,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const Icon(Icons.play_circle_outline, size: 40, color: Colors.white),
+              const Gap.xs(),
               Text(
-                item['caption'].toString(),
-                style: theme.textTheme.bodySmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                'Film',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white70,
+                  letterSpacing: 1.1,
+                ),
               ),
             ],
-          ],
-        );
-      }).toList(growable: false),
+          ),
+        ),
+      ),
     );
   }
 }

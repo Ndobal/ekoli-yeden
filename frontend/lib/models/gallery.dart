@@ -115,6 +115,9 @@ class AlbumSummary {
     this.eventDate,
     this.location,
     this.festivalId,
+    this.festivalName,
+    this.festivalSlug,
+    this.year,
     this.isFestivalGallery = false,
     this.videoCount = 0,
   });
@@ -130,6 +133,9 @@ class AlbumSummary {
       eventDate: Json.strOrNull(json, 'event_date'),
       location: Json.strOrNull(json, 'location'),
       festivalId: Json.strOrNull(json, 'festival_id'),
+      festivalName: Json.strOrNull(json, 'festival_name'),
+      festivalSlug: Json.strOrNull(json, 'festival_slug'),
+      year: Json.intOrNull(json, 'year'),
       isFestivalGallery: Json.boolVal(json, 'is_festival_gallery'),
       videoCount: Json.intVal(json, 'video_count'),
     );
@@ -144,6 +150,14 @@ class AlbumSummary {
   final String? eventDate;
   final String? location;
   final String? festivalId;
+
+  /// The festival this album is a year of, named — so the Gallery can offer
+  /// "Leboku" as a filter and label the album without a second request.
+  final String? festivalName;
+  final String? festivalSlug;
+
+  /// Which year's celebration this is.
+  final int? year;
   final bool isFestivalGallery;
   final int videoCount;
 
@@ -151,13 +165,15 @@ class AlbumSummary {
   /// to anybody who can fill it, and hidden from a visitor who cannot.
   bool get isEmpty => itemCount == 0;
 
-  /// The year a festival album belongs to, pulled from its title where the
-  /// album carries no date of its own — "Leboku 2026" is the common shape.
-  String? get year {
-    if (eventDate != null && eventDate!.length >= 4) return eventDate!.substring(0, 4);
-    final RegExpMatch? match = RegExp(r'\b(19|20)\d{2}\b').firstMatch(title);
-    return match?.group(0);
-  }
+  /// The year this album belongs to, where it belongs to one.
+  ///
+  /// This used to be guessed — read off the event date, or pattern-matched
+  /// out of the title, because "Leboku 2026" is the common shape. Since
+  /// migration 0036 an album carries a real `year` column set by whoever
+  /// created it, so the guess is gone: retitling an album no longer moves it
+  /// in time, and an album whose title has no year in it is no longer
+  /// undated.
+  String? get yearLabel => year?.toString();
 }
 
 /// An album: an ordered set of photographs with a title and a description.

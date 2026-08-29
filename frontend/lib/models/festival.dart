@@ -167,6 +167,7 @@ class FestivalDetail {
     required this.programme,
     required this.videos,
     required this.gallery,
+    this.albums = const <FestivalAlbum>[],
     this.galleryId,
     this.gallerySlug,
   });
@@ -180,6 +181,9 @@ class FestivalDetail {
           .toList(growable: false),
       videos: Json.objectList(json, 'videos').map(Video.fromJson).toList(growable: false),
       gallery: Json.objectList(json, 'gallery'),
+      albums: Json.objectList(json, 'albums')
+          .map(FestivalAlbum.fromJson)
+          .toList(growable: false),
       galleryId: Json.strOrNull(json, 'gallery_id'),
       gallerySlug: Json.strOrNull(json, 'gallery_slug'),
     );
@@ -201,6 +205,12 @@ class FestivalDetail {
   /// Present even when the album is empty, because "this festival has an album
   /// and nothing is in it" is a different — and more useful — thing to say than
   /// nothing at all. It is what lets the page ask for photographs.
+  /// Every year of this festival, newest first.
+  ///
+  /// Each is an ordinary gallery carrying `festival_id` and `year`, so the same
+  /// record is listed by the Gallery section — one album, two doors.
+  final List<FestivalAlbum> albums;
+
   final String? galleryId;
   final String? gallerySlug;
 
@@ -242,4 +252,55 @@ class FestivalEdition {
   final String? startDate;
   final String? endDate;
   final bool isArchived;
+}
+
+
+/// One year of a festival.
+class FestivalAlbum {
+  const FestivalAlbum({
+    required this.id,
+    required this.slug,
+    required this.title,
+    this.year,
+    this.description,
+    this.location,
+    this.eventDate,
+    this.coverUrl,
+    this.photoCount = 0,
+    this.videoCount = 0,
+  });
+
+  factory FestivalAlbum.fromJson(Map<String, dynamic> json) => FestivalAlbum(
+    id: Json.str(json, 'id'),
+    slug: Json.str(json, 'slug'),
+    title: Json.str(json, 'title'),
+    year: Json.intOrNull(json, 'year'),
+    description: Json.strOrNull(json, 'description'),
+    location: Json.strOrNull(json, 'location'),
+    eventDate: Json.strOrNull(json, 'event_date'),
+    coverUrl: Json.strOrNull(json, 'cover_url'),
+    photoCount: Json.intVal(json, 'photo_count'),
+    videoCount: Json.intVal(json, 'video_count'),
+  );
+
+  final String id;
+  final String slug;
+  final String title;
+  final int? year;
+  final String? description;
+  final String? location;
+  final String? eventDate;
+  final String? coverUrl;
+  final int photoCount;
+  final int videoCount;
+
+  /// "12 photographs and 3 films", or what is true of it.
+  String get holdings {
+    final List<String> parts = <String>[
+      if (photoCount > 0) '$photoCount photograph${photoCount == 1 ? '' : 's'}',
+      if (videoCount > 0) '$videoCount film${videoCount == 1 ? '' : 's'}',
+    ];
+    if (parts.isEmpty) return 'Nothing published yet';
+    return parts.join(' and ');
+  }
 }
