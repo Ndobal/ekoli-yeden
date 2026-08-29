@@ -251,19 +251,52 @@ export class ContributionUploadService {
     options: {
       notes: string | null;
       requestId: string;
-      /** File it into this album in the same action. */
+      /** File it into this album. Defaults to the community album. */
       galleryId?: string | null;
-      /** Put it on the public site in the same action. */
+      /**
+       * Put it on the public site.
+       *
+       * DEFAULTS TO TRUE, which is a reversal.
+       *
+       * Approving used to accession the file and stop, leaving it in the
+       * archive and on no page. Thirteen contributed photographs and a film
+       * sat in that state — approved, invisible, and with a reviewer reasonably
+       * certain they had published them.
+       *
+       * "Approved" now means what everybody using the screen already thought it
+       * meant. Holding something back is still possible and is now the thing
+       * you ask for, which is the right way round: the unusual outcome should
+       * be the one that needs a decision.
+       */
       publish?: boolean;
+      /**
+       * Who took it, where that is not the person who sent it in.
+       *
+       * A member forwarding an elder's photograph should be able to credit the
+       * elder. Recorded on the media asset and on the album entry, so the
+       * credit survives the file being used somewhere else.
+       */
+      credit?: string | null;
     },
   ): Promise<{ mediaAssetId: string; galleryItemId: string | null; published: boolean }> {
     const record = await this.find(id);
     if (!record) throw new NotFoundError('That file was not found.');
+
+    // Approving means publishing unless somebody says otherwise, and a file
+    // with no album named goes to the community album rather than nowhere.
+    // `publish: false` is still honoured — holding something back is now the
+    // thing you ask for.
+    const settled = {
+      ...options,
+      publish: options.publish !== false,
+      galleryId: options.galleryId ?? 'community-contributions',
+    };
+
     if (record.status === 'promoted' && record.media_asset_id) {
       // Already accessioned. Filing and publishing are still allowed, because
       // the common way to arrive here is somebody approving a file, realising
       // it never appeared anywhere, and coming back to finish the job.
-      return this.fileAndPublish(record.media_asset_id, options, reviewer);
+      return this.fileAndPublish(record.media_asset_id, settled, reviewer, record);
     }
 
     const object = await this.bucket.get(record.storage_key);
@@ -301,7 +334,7 @@ export class ContributionUploadService {
       title: record.caption,
       description: record.caption,
       alt_text: record.caption,
-      credit: record.contributor_name,
+      credit: options.credit ?? record.contributor_name,
       // Approved is not published. A second, deliberate act puts it on the site.
       status: CONTENT_STATUS.APPROVED,
       uploaded_by: null,
@@ -350,7 +383,7 @@ export class ContributionUploadService {
       requestId: options.requestId,
     });
 
-    return this.fileAndPublish(mediaAssetId, options, reviewer, record);
+    return this.fileAndPublish(mediaAssetId, settled, reviewer, record);
   }
 
   /**
@@ -374,7 +407,7 @@ export class ContributionUploadService {
    */
   private async fileAndPublish(
     mediaAssetId: string,
-    options: { galleryId?: string | null; publish?: boolean; requestId: string },
+    options: { galleryId?: string | null; publish?: boolean; requestId: string; credit?: string | null },
     reviewer: AuthenticatedUser,
     record?: { caption: string | null; contributor_name: string | null; taken_at: string | null; location: string | null },
   ): Promise<{ mediaAssetId: string; galleryItemId: string | null; published: boolean }> {
@@ -395,7 +428,10 @@ export class ContributionUploadService {
           galleryId: album.id,
           mediaAssetId,
           caption: record?.caption ?? null,
-          photographer: null,
+          // Who took it. The reviewer's correction wins over the name of
+          // whoever happened to send the file in — a member forwarding an
+          // elder's photograph should be able to credit the elder.
+          photographer: options.credit ?? record?.contributor_name ?? null,
           peoplePictured: null,
           takenAt: record?.taken_at ?? null,
           location: record?.location ?? null,

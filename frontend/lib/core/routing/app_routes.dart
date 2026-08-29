@@ -440,11 +440,13 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
     path: AppRoutes.gallery,
     description: 'Photographs and film from the archive',
   ),
-  NavItem(
-    label: 'Community',
-    path: AppRoutes.community,
-    description: 'Development projects, inside the news section',
-  ),
+  // Community and Videos are deliberately absent.
+  //
+  // Both still exist and both still have their own address — the development
+  // projects live inside the News section, and film sits in the Gallery beside
+  // the photographs, which is where somebody looking for "what did this look
+  // like" actually goes. Listing them again in the top navigation advertised
+  // two doors into rooms the visitor was already standing in.
   NavItem(
     label: 'Join',
     path: AppRoutes.join,

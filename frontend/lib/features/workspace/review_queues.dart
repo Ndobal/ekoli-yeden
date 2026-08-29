@@ -638,18 +638,57 @@ class OpportunityReviewPage extends StatefulWidget {
 }
 
 class _OpportunityReviewPageState extends State<OpportunityReviewPage> {
-  /// Reports first, and by default.
+  /// Reports first WHEN THERE ARE ANY.
   ///
-  /// A queue of new listings can wait an hour. A listing somebody has said is
-  /// asking them for money cannot.
-  bool _showReports = true;
+  /// A listing somebody has said is asking them for money cannot wait an hour;
+  /// a queue of new listings can. But opening on Reported when nothing has been
+  /// reported showed an administrator an empty page with a cheerful "Nothing
+  /// reported" on it, while a listing waited to be published behind the other
+  /// chip — so the answer to "how do I approve an opportunity?" was to notice a
+  /// chip that looked like a filter on the empty thing you were already
+  /// looking at.
+  ///
+  /// Both counts are now loaded up front, they sit on the chips, and the tab
+  /// that opens is the one with work in it.
+  bool? _showReports;
   String _status = 'pending_review';
   int _reloads = 0;
   String? _notice;
 
+  int _reportCount = 0;
+  int _pendingCount = 0;
+  bool _countsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCounts();
+  }
+
+  Future<void> _loadCounts() async {
+    final OpportunityRepository repository = context.read<OpportunityRepository>();
+    try {
+      final List<OpportunityReport> reports = await repository.reports();
+      final PaginatedResult<Opportunity> pending =
+          await repository.forReview(status: 'pending_review');
+      if (!mounted) return;
+      setState(() {
+        _reportCount = reports.length;
+        _pendingCount = pending.total;
+        _countsLoaded = true;
+        // Only choose for them the first time; once they have picked a tab it
+        // is theirs.
+        _showReports ??= reports.isNotEmpty || pending.total == 0;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _countsLoaded = true);
+    }
+  }
+
   void _reload(String message) => setState(() {
     _reloads += 1;
     _notice = message;
+    _loadCounts();
   });
 
   @override
@@ -681,13 +720,19 @@ class _OpportunityReviewPageState extends State<OpportunityReviewPage> {
             runSpacing: AppSpacing.sm,
             children: <Widget>[
               ChoiceChip(
-                label: const Text('Reported'),
-                selected: _showReports,
+                label: Text(
+                  _countsLoaded && _reportCount > 0 ? 'Reported ($_reportCount)' : 'Reported',
+                ),
+                selected: _showReports ?? true,
                 onSelected: (_) => setState(() => _showReports = true),
               ),
               ChoiceChip(
-                label: const Text('Waiting to be published'),
-                selected: !_showReports,
+                label: Text(
+                  _countsLoaded && _pendingCount > 0
+                      ? 'Waiting to be published ($_pendingCount)'
+                      : 'Waiting to be published',
+                ),
+                selected: !(_showReports ?? true),
                 onSelected: (_) => setState(() {
                   _showReports = false;
                   _status = 'pending_review';
@@ -696,7 +741,7 @@ class _OpportunityReviewPageState extends State<OpportunityReviewPage> {
             ],
           ),
           const Gap.xl(),
-          if (_showReports)
+          if (_showReports ?? true)
             AsyncContent<List<OpportunityReport>>(
               key: ValueKey<String>('reports:$_reloads'),
               load: repository.reports,

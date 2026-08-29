@@ -138,17 +138,24 @@ export async function approveContribution(context: RequestContext): Promise<Resp
   const validated = new Validator(body)
     .string('review_notes', { max: 2000, label: 'Review notes' })
     .string('gallery_id', { max: 64, label: 'Album' })
+    .string('credit', { max: 200, label: 'Credit' })
     .boolean('publish')
     .validated();
 
   const service = new ContributionUploadService(context.env);
   const result = await service.approve(context.params['id'] ?? '', reviewer, {
     notes: (validated['review_notes'] as string | null) ?? null,
-    // Both optional. Approving on its own still only accessions the file —
-    // filing it into an album and putting it on the site are things the
-    // reviewer asks for, not things that happen to them.
+    // Both optional, and both now have useful defaults: no album means the
+    // community album, and no answer on publishing means publish. Approving a
+    // contributed photograph and having it appear nowhere was the single most
+    // confusing thing on this screen.
     galleryId: (validated['gallery_id'] as string | null) ?? null,
-    publish: validated['publish'] === 1 || validated['publish'] === true,
+    // Absent means publish. Only an explicit `false` holds it back.
+    publish: body['publish'] === undefined
+      ? true
+      : validated['publish'] === 1 || validated['publish'] === true,
+    // Who took it, where that is not who sent it in.
+    credit: (validated['credit'] as string | null) ?? null,
     requestId: context.requestId,
   });
 
@@ -170,7 +177,7 @@ export async function approveContribution(context: RequestContext): Promise<Resp
  */
 function messageFor(result: { published: boolean; galleryItemId: string | null }): string {
   if (result.published && result.galleryItemId) {
-    return 'Approved, filed into the album and published. It is on the public site now.';
+    return 'Approved and published. It is in the album and on the public site now.';
   }
   if (result.published) {
     return 'Approved and published. It is visible at its own address, but it is not in any album '
