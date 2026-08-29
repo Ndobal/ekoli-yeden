@@ -102,19 +102,7 @@ export class MembershipService {
     // Every registered person belongs to it from the moment they register and
     // nobody has to ask — that is what makes it the room the whole community
     // can be reached in.
-    //
-    // Done here rather than in the registration handler because this method is
-    // also what repairs an account that never got a membership, and a member
-    // repaired without their forum would be a member nobody could reach.
-    const forum = new ForumRepository(this.env.DB);
-    const general = await forum.defaultSpace();
-    if (general) {
-      await forum.setMembership({
-        spaceId: general.id,
-        userId: user.id,
-        state: 'member',
-      });
-    }
+    await this.joinDefaultForum(user.id);
 
     const profile = await this.members.findByUserId(user.id);
     await this.recalculateCompletion(profile);
@@ -172,10 +160,54 @@ export class MembershipService {
    * Never throws for an account that already has a profile, and never
    * downgrades an existing one.
    */
+  /**
+   * Puts somebody in the General Forum.
+   *
+   * Called from BOTH creation paths, which is the whole reason it exists as a
+   * method: it was first written inside `join()` alone, and registration goes
+   * through `ensureMembership()` — so every account created by registering was
+   * a member of the community and a member of no forum. The test account that
+   * found it had `isMember: true`, a handle, a membership number, and no way
+   * into the room every member is supposed to be in.
+   *
+   * Silent when no default space is configured. A community that has not
+   * nominated one is not an error; it simply has no automatic forum.
+   */
+  private async joinDefaultForum(userId: string): Promise<void> {
+    const forum = new ForumRepository(this.env.DB);
+    const general = await forum.defaultSpace();
+    if (!general) return;
+
+    // Two indexed reads rather than a write on every call. This runs on every
+    // `/api/auth/me`, and the common case by far is that the row already
+    // exists — nobody leaves the General Forum, so any row at all means the
+    // work is done.
+    const existing = await forum.membershipFor(general.id, userId);
+    if (existing) return;
+
+    await forum.setMembership({
+      spaceId: general.id,
+      userId,
+      state: 'member',
+    });
+  }
+
   async ensureMembership(
     user: AuthenticatedUser,
     context: { requestId: string },
   ): Promise<void> {
+    // THE FORUM IS CHECKED BEFORE THE EARLY RETURN, AND SEPARATELY.
+    //
+    // An account can have a profile and no forum membership: every account
+    // registered between the forum-membership migration and the fix below was
+    // in exactly that state, and so is every account whose profile was
+    // repaired by an earlier version of this method.
+    //
+    // Putting this after the `existing` check meant the repair only ever ran
+    // for accounts that had no profile — which is to say, never for the ones
+    // that actually needed it.
+    await this.joinDefaultForum(user.id);
+
     const existing = await this.members.findByUserId(user.id);
     if (existing) return;
 
@@ -199,6 +231,11 @@ export class MembershipService {
 
     const role = await this.users.findRoleBySlug('okoli_member');
     if (role) await this.users.assignRole(user.id, role.id, null);
+
+    // And the General Forum. Registration reaches membership through THIS
+    // method, so an account created without this line is a member of the
+    // community and a member of no forum.
+    await this.joinDefaultForum(user.id);
 
     const profile = await this.members.findByUserId(user.id);
     await this.recalculateCompletion(profile);

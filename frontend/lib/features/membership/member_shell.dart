@@ -756,27 +756,45 @@ class _TopBar extends StatelessWidget {
         vertical: AppSpacing.lg,
       ),
       color: AppColors.backgroundDeep,
+      // EVERY FLEXIBLE PART OF THIS ROW IS ACTUALLY FLEXIBLE.
+      //
+      // The title used to size itself and the search field took the rest, which
+      // held together until the bell and the chat icon were added beside the
+      // avatar — then a long title, a greeting and a full name overflowed the
+      // row by about seventy pixels. A RenderFlex overflow in a release web
+      // build does not draw a stripe; it takes the content area with it, so the
+      // page went blank for exactly the people whose names and subtitles are
+      // longest, which is to say the ones who also hold a role and get extra
+      // chrome here.
       child: Row(
         children: <Widget>[
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                title,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              if (subtitle != null)
+          Flexible(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
                 Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  title,
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-            ],
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(width: AppSpacing.xxl),
+          const SizedBox(width: AppSpacing.lg),
           if (searchHint != null)
-            Expanded(
+            Flexible(
+              flex: 4,
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 460),
@@ -786,7 +804,7 @@ class _TopBar extends StatelessWidget {
             )
           else
             const Spacer(),
-          const SizedBox(width: AppSpacing.lg),
+          const SizedBox(width: AppSpacing.md),
           ...actions,
           // The bell and the chat icon, each with its own count. A
           // notification is something that happened to you; a message is
@@ -868,12 +886,15 @@ class _Avatar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 130),
-          child: Text(
-            name,
-            style: theme.textTheme.titleSmall,
-            overflow: TextOverflow.ellipsis,
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 130),
+            child: Text(
+              name,
+              style: theme.textTheme.titleSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
       ],
