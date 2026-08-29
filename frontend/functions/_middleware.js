@@ -330,6 +330,11 @@ export async function onRequest(context) {
     // The no-JavaScript summary is replaced with this page's own content, so a
     // crawler that never executes Flutter still reads something meaningful.
     .on('div#seo-content', new ContentSetter(meta.body))
+    // And the structured data describes THIS page rather than repeating what
+    // the site is. See `buildSchema`.
+    .on('script#page-schema', new ContentSetter(
+      buildSchema(url.pathname.replace(/\/+$/, '') || '/', meta.canonical, meta, meta.record),
+    ))
     .transform(response);
 
   const headers = new Headers(rewritten.headers);
@@ -458,6 +463,7 @@ async function resolveMetadata(url) {
         canonical,
         image: DEFAULT_IMAGE,
         type: 'article',
+        record,
         body:
           `<h1>${escapeHtml(title)}</h1>` +
           `<p>${escapeHtml(description)}</p>` +
@@ -487,13 +493,20 @@ async function resolveMetadata(url) {
 
   const page = PAGES[path];
   if (page) {
+    // A section page carries links to what it holds, so a crawler that never
+    // runs JavaScript has a route into the archive rather than a dead end.
+    const listing =
+      segments.length === 1 && DETAIL_ROUTES[segments[0]]
+        ? await sectionListing(DETAIL_ROUTES[segments[0]].resource, path)
+        : '';
+
     return {
       title: path === '/' ? page.title : `${page.title} | ${SITE_NAME}`,
       description: page.description,
       canonical,
       image: DEFAULT_IMAGE,
       type: 'website',
-      body: `<h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.description)}</p>`,
+      body: `<h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.description)}</p>${listing}`,
     };
   }
 
@@ -602,4 +615,246 @@ class ContentSetter {
   element(element) {
     element.setInnerContent(this.html, { html: true });
   }
+}
+
+/**
+ * The structured data for one page.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT THE SAME ON EVERY PAGE
+ * ---------------------------------------------------------------------------
+ *
+ * It used to be. Every page carried the identical Organization / WebSite /
+ * Place graph, which tells a search engine what this SITE is and nothing at all
+ * about what the PAGE is — so a history entry, a person's biography and the
+ * gallery were, to a machine, three copies of the same statement.
+ *
+ * Each page now adds the thing it is actually about. That is the difference
+ * between "there is a website about Ekori" and "there is a record of the Leboku
+ * festival, published on this date, part of this archive" — and the second is
+ * what gets quoted back when somebody asks an assistant about Ekori.
+ *
+ * The site-wide nodes stay: they are what tie every page to one organisation
+ * and one place, and a graph without them is a set of orphan facts.
+ */
+function buildSchema(path, canonical, meta, record) {
+  const graph = [
+    {
+      '@type': 'Organization',
+      '@id': `${SITE}/#organization`,
+      name: SITE_NAME,
+      alternateName: ['Ekoli-Yeden', 'Ekori'],
+      url: `${SITE}/`,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${SITE}/icons/Icon-512.png`,
+        width: 512,
+        height: 512,
+      },
+      slogan: TAGLINE,
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE}/#website`,
+      url: `${SITE}/`,
+      name: SITE_NAME,
+      description: TAGLINE,
+      publisher: { '@id': `${SITE}/#organization` },
+      inLanguage: 'en-NG',
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: { '@type': 'EntryPoint', urlTemplate: `${SITE}/search?q={search_term_string}` },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+    {
+      '@type': 'Place',
+      '@id': `${SITE}/#place`,
+      name: 'Ekoli-Yeden',
+      alternateName: 'Ekori',
+      description:
+        'A community of the Yakurr people in Cross River State, Nigeria, with its own language, ' +
+        'institutions and traditions.',
+      address: {
+        '@type': 'PostalAddress',
+        addressRegion: 'Cross River State',
+        addressCountry: 'NG',
+      },
+    },
+  ];
+
+  const segments = path.split('/').filter(Boolean);
+
+  // Where the reader is, so a search engine can show the trail rather than a
+  // bare URL — and so an assistant knows a page is part of a section.
+  if (segments.length > 0) {
+    graph.push({
+      '@type': 'BreadcrumbList',
+      '@id': `${canonical}#breadcrumb`,
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        ...segments.map((segment, index) => ({
+          '@type': 'ListItem',
+          position: index + 2,
+          name: titleCase(segment.replace(/-/g, ' ')),
+          item: `${SITE}/${segments.slice(0, index + 1).join('/')}`,
+        })),
+      ],
+    });
+  }
+
+  // The entity this page is about.
+  if (record) {
+    const kind = SCHEMA_TYPES[segments[0]] ?? 'Article';
+    const name = meta.title.split(' — ')[0].split(' | ')[0];
+
+    const node = {
+      '@type': kind,
+      '@id': `${canonical}#entity`,
+      name,
+      url: canonical,
+      description: meta.description,
+      isPartOf: { '@id': `${SITE}/#website` },
+      publisher: { '@id': `${SITE}/#organization` },
+      contentLocation: { '@id': `${SITE}/#place` },
+      inLanguage: 'en-NG',
+    };
+
+    if (kind === 'Article' || kind === 'NewsArticle') {
+      node.headline = name;
+      if (record.published_at || record.news_date || record.created_at) {
+        node.datePublished = record.published_at || record.news_date || record.created_at;
+      }
+      if (record.updated_at) node.dateModified = record.updated_at;
+      // Attribution matters more here than anywhere: the archive's whole claim
+      // is that what it holds came from somebody who knew it.
+      if (record.author_name || record.contributor_name) {
+        node.author = {
+          '@type': 'Person',
+          name: record.author_name || record.contributor_name,
+        };
+      } else {
+        node.author = { '@id': `${SITE}/#organization` };
+      }
+      if (record.body) node.articleBody = truncate(record.body, 5000);
+    }
+
+    if (kind === 'Person') {
+      if (record.headline || record.profession) node.jobTitle = record.headline || record.profession;
+      if (record.biography) node.description = truncate(record.biography, 1000);
+      if (record.birth_year) node.birthDate = String(record.birth_year);
+      node.homeLocation = { '@id': `${SITE}/#place` };
+    }
+
+    if (kind === 'Event') {
+      node.location = { '@id': `${SITE}/#place` };
+      if (record.start_datetime || record.event_date) {
+        node.startDate = record.start_datetime || record.event_date;
+      }
+      node.eventStatus = 'https://schema.org/EventScheduled';
+      node.organizer = { '@id': `${SITE}/#organization` };
+    }
+
+    if (kind === 'ImageGallery' || kind === 'VideoObject') {
+      node.about = { '@id': `${SITE}/#place` };
+    }
+
+    graph.push(node);
+  } else {
+    // A section page is a collection of the things below it.
+    graph.push({
+      '@type': 'CollectionPage',
+      '@id': `${canonical}#page`,
+      name: meta.title.split(' | ')[0],
+      url: canonical,
+      description: meta.description,
+      isPartOf: { '@id': `${SITE}/#website` },
+      about: { '@id': `${SITE}/#place` },
+      inLanguage: 'en-NG',
+    });
+  }
+
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
+}
+
+/**
+ * What kind of thing each section holds.
+ *
+ * Deliberately specific: `Person` rather than `Article` for a biography is the
+ * difference between a search engine knowing Ekori has a page about somebody
+ * and knowing that a person exists and this is who they are.
+ */
+const SCHEMA_TYPES = {
+  history: 'Article',
+  culture: 'Article',
+  stories: 'Article',
+  news: 'NewsArticle',
+  people: 'Person',
+  leaders: 'Person',
+  ancestry: 'Person',
+  events: 'Event',
+  festivals: 'Event',
+  leboku: 'Event',
+  gallery: 'ImageGallery',
+  videos: 'VideoObject',
+  voices: 'AudioObject',
+  language: 'DefinedTerm',
+  places: 'Place',
+  businesses: 'LocalBusiness',
+  organizations: 'Organization',
+  community: 'Article',
+  'age-grades': 'Organization',
+  'cultural-groups': 'Organization',
+  music: 'Article',
+};
+
+/**
+ * The entries a section holds, as real links.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A SECTION PAGE NEEDS THIS
+ * ---------------------------------------------------------------------------
+ *
+ * This site is a Flutter application: the list of history entries is drawn by
+ * JavaScript after the page loads. A crawler that runs JavaScript eventually
+ * sees it; a crawler that does not sees a heading and a sentence, and there is
+ * no path from `/history` to any history entry at all.
+ *
+ * Most of the assistants people now ask about places do not run JavaScript.
+ * Neither do several of the crawlers that matter for a small site's first year.
+ * The sitemap lists every entry, which is enough to have them fetched — but a
+ * sitemap carries no context, so what gets fetched arrives with no idea of what
+ * it belongs to or how it relates to anything else.
+ *
+ * Real links fix both. They give a crawler a route into the archive and they
+ * tell it the shape of the thing it is crawling.
+ *
+ * Twenty is a deliberate ceiling. This runs at the edge on every crawl of a
+ * section page, and the point is discovery — a crawler that follows twenty
+ * links finds the next twenty from the sitemap.
+ */
+async function sectionListing(resource, basePath) {
+  const data = await fetchJson(`${API}/api/${resource}?per_page=20`);
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (items.length === 0) return '';
+
+  const rows = items
+    .map((item) => {
+      const slug = item.slug || item.id;
+      if (!slug) return '';
+      const label = item.title || item.name || item.full_name || item.word || slug;
+      const blurb = truncate(
+        item.summary || item.excerpt || item.description || item.headline || '',
+        160,
+      );
+      return (
+        `<li><a href="${SITE}${basePath}/${escapeHtml(String(slug))}">${escapeHtml(String(label))}</a>` +
+        (blurb ? ` — ${escapeHtml(blurb)}` : '') +
+        '</li>'
+      );
+    })
+    .filter(Boolean)
+    .join('');
+
+  return rows ? `<ul>${rows}</ul>` : '';
 }

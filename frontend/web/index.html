@@ -67,7 +67,14 @@
     archive belonging to an organisation, rather than a generic page, and it is
     what can produce a richer result with the logo and a search box.
   -->
-  <script type="application/ld+json">
+  <!--
+    Rewritten per page at the edge by `functions/_middleware.js`, which adds the
+    entity this particular page is about — an Article for a history entry, a
+    Person for somebody in the People section — to the graph below. What is
+    written here is the site-wide part, and the fallback if the edge function
+    ever cannot run.
+  -->
+  <script id="page-schema" type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [

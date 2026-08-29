@@ -1,4 +1,5 @@
 import type { RouteDefinition } from '../types/api';
+import { communityOverview } from '../controllers/community.controller';
 import { CONTENT_RESOURCES } from '../services/content-registry';
 import { publicList, publicShow } from '../controllers/content.controller';
 import { listFestivals, showFestival, lebokuIndex } from '../controllers/festival.controller';
@@ -126,6 +127,13 @@ export const publicRoutes: RouteDefinition[] = [
 
   // --- Search --------------------------------------------------------------
   { method: 'GET', path: '/api/search', handler: search, description: 'Search the whole archive' },
+  // The community hub: who is here, what they belong to, and what has happened.
+  {
+    method: 'GET',
+    path: '/api/community/overview',
+    handler: communityOverview,
+    description: 'Members, groups, counts and a feed of what has happened lately',
+  },
   {
     method: 'GET',
     path: '/api/search/sources',

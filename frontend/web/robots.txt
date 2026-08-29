@@ -21,4 +21,58 @@ Disallow: /register
 # A search results page is not itself content worth indexing.
 Disallow: /search?
 
+# A member's own area: their dashboard, their messages, their private profile
+# settings. Behind a sign-in either way; excluded so none of it turns up in a
+# search result that then asks the reader to sign in.
+Disallow: /account
+Disallow: /account/
+Disallow: /messages
+Disallow: /messages/
+
+# ---------------------------------------------------------------------------
+# ASSISTANTS AND AI CRAWLERS
+# ---------------------------------------------------------------------------
+#
+# Named explicitly and allowed, though `User-agent: *` above already permits
+# them. The reason is the whole purpose of this archive: when somebody asks an
+# assistant about Ekori, the answer should come from the community's own
+# verified record rather than from scattered posts and guesswork. Leaving that
+# to a wildcard invites an operator, or a future default, to read the silence
+# as a refusal.
+#
+# ALL OF THEM IN ONE GROUP, AND THE EXCLUSIONS REPEATED.
+#
+# A named group REPLACES the wildcard rules for that agent rather than adding
+# to them. Naming these crawlers and writing only `Allow: /` would therefore
+# have handed them the administration area, the editorial workspace and the
+# sign-in pages that `*` above is careful to keep out — the exact opposite of
+# what naming them was for.
+
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: anthropic-ai
+User-agent: PerplexityBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /editorial
+Disallow: /editorial/
+Disallow: /sign-in
+Disallow: /register
+Disallow: /account
+Disallow: /account/
+Disallow: /messages
+Disallow: /messages/
+Disallow: /search?
+
+# What is here, what is verified, and the one thing not to do with it.
+# See https://ekoli.pages.dev/llms.txt
+
 Sitemap: https://ekoli.pages.dev/sitemap.xml
