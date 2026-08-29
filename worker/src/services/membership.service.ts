@@ -333,6 +333,34 @@ export class MembershipService {
       payload['is_diaspora'] = isDiaspora(country) ? 1 : 0;
     }
 
+    // THE DAY AND THE MONTH ARE DERIVED, THE YEAR IS NOT PUBLISHED.
+    //
+    // `birth_day` and `birth_month` are what the birthdays page reads, because
+    // "whose birthday is it today" is a question about a day and a month and
+    // must not require anybody's age to answer it. They are derived here so a
+    // member gives one date and cannot leave the three fields disagreeing.
+    //
+    // The year stays in `birth_date` and `birth_year` and is used for the
+    // age-grade brackets. Whether anybody may see it is `show_age`, which is
+    // a separate switch from `show_birthday` on purpose: plenty of people are
+    // glad to be wished a happy birthday and would rather not publish an age.
+    if ('birth_date' in payload) {
+      const raw = payload['birth_date'];
+      if (raw === null || raw === '') {
+        payload['birth_date'] = null;
+        payload['birth_day'] = null;
+        payload['birth_month'] = null;
+        payload['birth_year'] = null;
+      } else {
+        const parsed = new Date(String(raw));
+        if (!Number.isNaN(parsed.getTime())) {
+          payload['birth_day'] = parsed.getUTCDate();
+          payload['birth_month'] = parsed.getUTCMonth() + 1;
+          payload['birth_year'] = parsed.getUTCFullYear();
+        }
+      }
+    }
+
     // "Where in Ekori are you from?" is answered in the member's own words,
     // and those words are kept. What the archive matched them to is recorded
     // beside them, never instead of them — a wrong match is then something a

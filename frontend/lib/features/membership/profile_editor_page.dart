@@ -111,6 +111,10 @@ class _EditorState extends State<_Editor> {
   String? _employmentStatus;
   bool _openToOpportunities = false;
   bool _openToMentoring = false;
+  DateTime? _birthDate;
+  bool _showBirthday = false;
+  bool _birthdayWishes = true;
+  bool _showAge = false;
   final TextEditingController _mentoringNote = TextEditingController();
 
   late List<MemberSkillEntry> _skills;
@@ -151,6 +155,10 @@ class _EditorState extends State<_Editor> {
     _employmentStatus = p.employmentStatus;
     _openToOpportunities = p.openToOpportunities;
     _openToMentoring = p.openToMentoring;
+    _birthDate = DateTime.tryParse(p.birthDate ?? '');
+    _showBirthday = p.showBirthday;
+    _birthdayWishes = p.birthdayWishesEnabled;
+    _showAge = p.showAge;
     _mentoringNote.text = p.mentoringNote ?? '';
 
     _skills = p.skills
@@ -202,8 +210,18 @@ class _EditorState extends State<_Editor> {
 
   MemberRepository get _repository => context.read<MemberRepository>();
 
+  static const List<String> _months = <String>[
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  static String _readableDate(DateTime date) =>
+      '${date.day} ${_months[date.month - 1]} ${date.year}';
+
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -470,6 +488,12 @@ class _EditorState extends State<_Editor> {
               'employment_status': _employmentStatus,
               'open_to_opportunities': _openToOpportunities,
               'open_to_mentoring': _openToMentoring,
+              // Sent as a plain date; the Worker derives the day and month and
+              // keeps the year out of anything public.
+              'birth_date': _birthDate?.toIso8601String().split('T').first,
+              'show_birthday': _showBirthday,
+              'birthday_wishes_enabled': _birthdayWishes,
+              'show_age': _showAge,
               'mentoring_note': _mentoringNote.text.trim(),
             });
           }),
@@ -496,6 +520,81 @@ class _EditorState extends State<_Editor> {
                 ),
               ),
               const Gap.lg(),
+              const Gap.xxl(),
+              Text('Your birthday', style: theme.textTheme.titleMedium),
+              const Gap.xs(),
+              Text(
+                'The day and month let the community wish you a happy birthday. The year is '
+                'never shown to anybody — it is only used to work out which age grade you '
+                'belong to.',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const Gap.md(),
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Date of birth',
+                  border: OutlineInputBorder(),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        _birthDate == null ? 'Not given' : _readableDate(_birthDate!),
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ),
+                    if (_birthDate != null)
+                      IconButton(
+                        tooltip: 'Clear',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _birthDate = null),
+                      ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.event_outlined, size: 18),
+                      label: Text(_birthDate == null ? 'Choose' : 'Change'),
+                      onPressed: () async {
+                        final DateTime now = DateTime.now();
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: _birthDate ?? DateTime(now.year - 30),
+                          firstDate: DateTime(now.year - 110),
+                          lastDate: now,
+                          helpText: 'Your date of birth',
+                        );
+                        if (picked != null) setState(() => _birthDate = picked);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              if (_birthDate != null) ...<Widget>[
+                const Gap.sm(),
+                SwitchListTile(
+                  value: _showBirthday,
+                  onChanged: (bool value) => setState(() => _showBirthday = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Let the community know when it is my birthday'),
+                  subtitle: const Text('Your day and month only, never the year.'),
+                ),
+                if (_showBirthday)
+                  SwitchListTile(
+                    value: _birthdayWishes,
+                    onChanged: (bool value) => setState(() => _birthdayWishes = value),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Allow members to leave me a birthday message'),
+                  ),
+                SwitchListTile(
+                  value: _showAge,
+                  onChanged: (bool value) => setState(() => _showAge = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show my age on my profile'),
+                  subtitle: const Text(
+                    'Separate from the switch above — you can be wished a happy birthday '
+                    'without publishing your age.',
+                  ),
+                ),
+              ],
               SwitchListTile(
                 value: _openToOpportunities,
                 onChanged: (bool value) => setState(() => _openToOpportunities = value),

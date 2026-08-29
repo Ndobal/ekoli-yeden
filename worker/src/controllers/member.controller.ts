@@ -219,6 +219,22 @@ export async function updateMyProfile(context: RequestContext): Promise<Response
   }
   if ('open_to_opportunities' in body) validator.boolean('open_to_opportunities');
 
+  // THE BIRTHDAY.
+  //
+  // `birth_date`, `birth_day`, `birth_month`, `show_birthday` and the wishes
+  // switch have existed since the birthdays module was built, along with the
+  // page that shows whose birthday it is. Nothing ever accepted a date, so
+  // that page could only ever be empty.
+  //
+  // The year is part of the date and is never published — it feeds the
+  // age-grade brackets. The day and month are derived on write by the service.
+  if ('birth_date' in body && body['birth_date'] !== null && body['birth_date'] !== '') {
+    validator.date('birth_date', { label: 'Date of birth' });
+  }
+  if ('show_birthday' in body) validator.boolean('show_birthday');
+  if ('birthday_wishes_enabled' in body) validator.boolean('birthday_wishes_enabled');
+  if ('show_age' in body) validator.boolean('show_age');
+
   // §14 of the proposal. Kept separate from `open_to_opportunities`: that one
   // says this person would like to hear about work, and this one says they are
   // willing to give their time to somebody younger. They are opposite

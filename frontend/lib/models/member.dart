@@ -51,6 +51,11 @@ class MemberProfile {
     this.workGroup,
     this.workGroupLabel,
     this.openToOpportunities = false,
+    this.birthDate,
+    this.showBirthday = false,
+    this.birthdayWishesEnabled = true,
+    this.showAge = false,
+    this.coverUrl,
     this.contactHidden = true,
     this.contactSharedWithMe = false,
     this.openToMentoring = false,
@@ -114,6 +119,11 @@ class MemberProfile {
       workGroup: Json.strOrNull(json, 'work_group'),
       workGroupLabel: Json.strOrNull(json, 'work_group_label'),
       openToOpportunities: Json.boolVal(json, 'open_to_opportunities'),
+      birthDate: Json.strOrNull(json, 'birth_date'),
+      showBirthday: Json.boolVal(json, 'show_birthday'),
+      birthdayWishesEnabled: Json.boolVal(json, 'birthday_wishes_enabled', fallback: true),
+      showAge: Json.boolVal(json, 'show_age'),
+      coverUrl: Json.strOrNull(json, 'cover_url'),
       contactHidden: Json.boolVal(json, 'contact_hidden', fallback: true),
       contactSharedWithMe: Json.boolVal(json, 'contact_shared_with_me'),
       openToMentoring: Json.boolVal(json, 'open_to_mentoring'),
@@ -217,6 +227,25 @@ class MemberProfile {
   final String? workGroupLabel;
 
   final bool openToOpportunities;
+
+  /// The full date of birth, ISO `yyyy-MM-dd`.
+  ///
+  /// The day and month drive the birthdays page; the year is used for age-grade
+  /// brackets and is never published.
+  final String? birthDate;
+
+  /// Whether the community may be told it is their birthday.
+  final bool showBirthday;
+
+  /// Whether other members may leave them a birthday message.
+  final bool birthdayWishesEnabled;
+
+  /// Separate from [showBirthday] on purpose — plenty of people are glad to be
+  /// wished a happy birthday and would rather not publish an age.
+  final bool showAge;
+
+  /// The band behind the portrait.
+  final String? coverUrl;
 
   /// True when this person's phone and email are both withheld from the viewer.
   ///

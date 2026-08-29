@@ -43,7 +43,9 @@ class WorkspaceShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool wide = context.screenWidth >= Breakpoints.laptop;
+    // Matches the member shell: `laptop` (1240) is wider than many laptops,
+    // so a desktop user was given a hamburger.
+    final bool wide = context.screenWidth >= Breakpoints.tablet;
 
     return Scaffold(
       appBar: wide
@@ -53,6 +55,13 @@ class WorkspaceShell extends StatelessWidget {
               backgroundColor: accent,
               foregroundColor: Colors.white,
               actions: actions,
+            ),
+      bottomNavigationBar: wide
+          ? null
+          : _WorkspaceBottomBar(
+              navigation: navigation,
+              currentPath: currentPath,
+              accent: accent,
             ),
       drawer: wide
           ? null
@@ -97,6 +106,102 @@ class WorkspaceShell extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// THE BOTTOM BAR IN THE WORKSPACES — PHONES ONLY.
+///
+/// The member area got one and the Editorial and Administration areas did not,
+/// so a Super Admin on a phone had a hamburger and nothing else while an
+/// ordinary member had their tools under the thumb. Somebody moderating from a
+/// phone at a festival is exactly the person who needs this most.
+///
+/// The four destinations come from whichever navigation list the workspace was
+/// given, in the order it already puts them — those lists are ordered by
+/// importance, so the first four are the right four — and `More` opens the
+/// same drawer as the hamburger, so there is one list of the workspace's
+/// screens rather than two that drift apart.
+class _WorkspaceBottomBar extends StatelessWidget {
+  const _WorkspaceBottomBar({
+    required this.navigation,
+    required this.currentPath,
+    required this.accent,
+  });
+
+  final List<NavItem> navigation;
+  final String currentPath;
+  final Color accent;
+
+  /// Icons by destination, with a sensible fallback.
+  ///
+  /// Kept here rather than on `NavItem` because only this bar needs them, and
+  /// a field on the shared model would have to be filled in for sixty entries
+  /// that will never appear in a bottom bar.
+  static IconData _iconFor(NavItem item) {
+    final String label = item.label.toLowerCase();
+    if (label.contains('overview') || label.contains('dashboard')) {
+      return Icons.dashboard_outlined;
+    }
+    if (label.contains('user')) return Icons.people_outline;
+    if (label.contains('role') || label.contains('permission')) return Icons.key_outlined;
+    if (label.contains('team')) return Icons.groups_outlined;
+    if (label.contains('content')) return Icons.article_outlined;
+    if (label.contains('submission') || label.contains('sent in')) {
+      return Icons.inbox_outlined;
+    }
+    if (label.contains('media') || label.contains('file')) return Icons.perm_media_outlined;
+    if (label.contains('news')) return Icons.newspaper_outlined;
+    if (label.contains('gallery') || label.contains('photograph')) {
+      return Icons.photo_library_outlined;
+    }
+    if (label.contains('setting')) return Icons.settings_outlined;
+    if (label.contains('security') || label.contains('audit')) return Icons.shield_outlined;
+    return Icons.folder_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final List<NavItem> primary = navigation.take(4).toList(growable: false);
+    if (primary.isEmpty) return const SizedBox.shrink();
+
+    int selected = primary.length; // `More`, when nothing else matches.
+    for (int i = 0; i < primary.length; i++) {
+      final String path = primary[i].path;
+      if (currentPath == path || currentPath.startsWith('$path/')) {
+        selected = i;
+        break;
+      }
+    }
+
+    return NavigationBar(
+      selectedIndex: selected,
+      backgroundColor: theme.colorScheme.surface,
+      indicatorColor: accent.withValues(alpha: 0.18),
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      height: 66,
+      onDestinationSelected: (int index) {
+        if (index == primary.length) {
+          Scaffold.of(context).openDrawer();
+          return;
+        }
+        context.go(primary[index].path);
+      },
+      destinations: <Widget>[
+        for (final NavItem item in primary)
+          NavigationDestination(
+            icon: Icon(_iconFor(item)),
+            selectedIcon: Icon(_iconFor(item), color: accent),
+            // Bottom-bar labels have to fit under an icon on a small phone.
+            label: item.label.split(' ').first,
+          ),
+        NavigationDestination(
+          icon: const Icon(Icons.menu),
+          selectedIcon: Icon(Icons.menu, color: accent),
+          label: 'More',
+        ),
+      ],
     );
   }
 }

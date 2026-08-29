@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/errors/app_exception.dart';
@@ -19,6 +21,7 @@ class AuthController extends ChangeNotifier {
   AppUser? _user;
   String? _errorMessage;
   bool _busy = false;
+  Timer? _identityPoll;
 
   AuthStatus get status => _status;
   AppUser? get user => _user;
@@ -52,11 +55,56 @@ class AuthController extends ChangeNotifier {
   /// Contributing requires a membership. Reading never does.
   bool get canContribute => _user?.canContribute ?? false;
 
+  /// RE-ASKS THE SERVER WHO THIS PERSON IS.
+  ///
+  /// Roles and permissions are resolved fresh on the server for every request,
+  /// so a promotion takes effect there immediately. The client, though, holds
+  /// the answer it was given when the session started — and the router decides
+  /// whether to admit somebody to the administration area from that copy.
+  ///
+  /// So promoting a member while they were signed in did nothing they could
+  /// see: they were bounced out of `/admin` by a permission list from before
+  /// the promotion, and the only cure was to sign out and back in, which
+  /// nobody thinks to suggest.
+  ///
+  /// This re-reads it — on a timer while signed in, and immediately whenever
+  /// somebody calls it. Failure is silent: a refresh that cannot reach the
+  /// server must never sign anybody out.
+  Future<void> refreshIdentity() async {
+    if (!isSignedIn) return;
+    try {
+      final AppUser? fresh = await _service.currentUser();
+      if (fresh == null) return;
+      _user = fresh;
+      notifyListeners();
+    } catch (_) {
+      // A stale identity is better than a false sign-out.
+    }
+  }
+
+  void _startIdentityPoll() {
+    _identityPoll?.cancel();
+    // Five minutes: long enough to be invisible, short enough that an
+    // administrator who has just promoted somebody can tell them to wait a
+    // moment rather than to sign out.
+    _identityPoll = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => refreshIdentity(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _identityPoll?.cancel();
+    super.dispose();
+  }
+
   /// Restores a session from storage on startup.
   Future<void> restore() async {
     final AppUser? restored = await _service.currentUser();
     _user = restored;
     _status = restored == null ? AuthStatus.signedOut : AuthStatus.signedIn;
+    if (restored != null) _startIdentityPoll();
     notifyListeners();
   }
 
@@ -65,6 +113,7 @@ class AuthController extends ChangeNotifier {
     try {
       _user = await _service.login(email: email, password: password);
       _status = AuthStatus.signedIn;
+      _startIdentityPoll();
       _errorMessage = null;
       return true;
     } on AppException catch (error) {
@@ -88,6 +137,7 @@ class AuthController extends ChangeNotifier {
         displayName: displayName,
       );
       _status = AuthStatus.signedIn;
+      _startIdentityPoll();
       _errorMessage = null;
       return true;
     } on AppException catch (error) {
@@ -101,6 +151,7 @@ class AuthController extends ChangeNotifier {
   Future<void> signOut() async {
     await _service.logout();
     _user = null;
+    _identityPoll?.cancel();
     _status = AuthStatus.signedOut;
     _errorMessage = null;
     notifyListeners();
@@ -110,6 +161,7 @@ class AuthController extends ChangeNotifier {
   void onSessionExpired() {
     if (_status == AuthStatus.signedOut) return;
     _user = null;
+    _identityPoll?.cancel();
     _status = AuthStatus.signedOut;
     _errorMessage = 'Your session has ended. Please sign in again.';
     notifyListeners();
