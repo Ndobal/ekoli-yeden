@@ -8,6 +8,7 @@ import '../config/cms_controller.dart';
 import '../errors/app_exception.dart';
 import '../config/site_settings_controller.dart';
 import '../routing/app_routes.dart';
+import 'header_inbox.dart';
 import '../../features/membership/member_shell.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -148,7 +149,10 @@ class _Header extends StatelessWidget {
                   if (wide) ...<Widget>[
                     // Only for somebody signed in: a messages button that
                     // always shows nothing is furniture.
-                    if (context.watch<AuthController>().isSignedIn) const MessagesButton(),
+                    // The bell and the chat icon together. The old lone
+                    // messages button showed a count with nowhere to act on it
+                    // and said nothing at all about notifications.
+                    const HeaderInbox(),
                     const Gap.hSm(),
                     const _AccountButton(),
                   ],

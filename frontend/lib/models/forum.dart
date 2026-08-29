@@ -35,6 +35,10 @@ class ForumSpace {
     this.canRead = false,
     this.canPost = false,
     this.blockedReason,
+    this.membershipState,
+    this.joinPolicy = 'request',
+    this.canRequestToJoin = false,
+    this.isDefault = false,
   });
 
   factory ForumSpace.fromJson(Map<String, dynamic> json) => ForumSpace(
@@ -52,6 +56,10 @@ class ForumSpace {
     canRead: Json.boolVal(json, 'can_read'),
     canPost: Json.boolVal(json, 'can_post'),
     blockedReason: Json.strOrNull(json, 'blocked_reason'),
+    membershipState: Json.strOrNull(json, 'membership_state'),
+    joinPolicy: Json.str(json, 'join_policy', fallback: 'request'),
+    canRequestToJoin: Json.boolVal(json, 'can_request_to_join'),
+    isDefault: Json.boolVal(json, 'is_default'),
   );
 
   final String id;
@@ -77,6 +85,24 @@ class ForumSpace {
 
   /// Why they cannot post, in words they can act on.
   final String? blockedReason;
+
+  /// Where this person stands here: `member`, `pending`, `rejected`,
+  /// `removed`, `suspended`, or null for somebody who has never asked.
+  final String? membershipState;
+
+  /// How the space is joined: `automatic`, `request` or `closed`.
+  final String joinPolicy;
+
+  /// Whether to offer a "join this forum" button.
+  final bool canRequestToJoin;
+
+  /// The General Forum — everybody is in it and nobody leaves it.
+  final bool isDefault;
+
+  bool get isMember => membershipState == 'member';
+  bool get isPending => membershipState == 'pending';
+  bool get wasRejected => membershipState == 'rejected';
+  bool get isSuspended => membershipState == 'suspended';
 
   bool get isPublic => visibility == 'public';
 }
@@ -556,4 +582,98 @@ class ForumReactions {
     (value: 'helpful', label: 'This helped'),
     (value: 'celebrate', label: 'Congratulations'),
   ];
+}
+
+
+/// A forum as it appears in a member's own list, with where they stand in it.
+class MyForum {
+  const MyForum({
+    required this.id,
+    required this.slug,
+    required this.name,
+    this.tagline,
+    this.state,
+    this.role,
+    this.decisionNote,
+    this.joinPolicy = 'request',
+    this.isDefault = false,
+    this.topicCount = 0,
+    this.canLeave = false,
+    this.canRequest = false,
+  });
+
+  factory MyForum.fromJson(Map<String, dynamic> json) => MyForum(
+    id: Json.str(json, 'id'),
+    slug: Json.str(json, 'slug'),
+    name: Json.str(json, 'name'),
+    tagline: Json.strOrNull(json, 'tagline'),
+    state: Json.strOrNull(json, 'state'),
+    role: Json.strOrNull(json, 'role'),
+    decisionNote: Json.strOrNull(json, 'decision_note'),
+    joinPolicy: Json.str(json, 'join_policy', fallback: 'request'),
+    isDefault: Json.boolVal(json, 'is_default'),
+    topicCount: Json.intVal(json, 'topic_count'),
+    canLeave: Json.boolVal(json, 'can_leave'),
+    canRequest: Json.boolVal(json, 'can_request'),
+  );
+
+  final String id;
+  final String slug;
+  final String name;
+  final String? tagline;
+  final String? state;
+  final String? role;
+  final String? decisionNote;
+  final String joinPolicy;
+  final bool isDefault;
+  final int topicCount;
+  final bool canLeave;
+  final bool canRequest;
+
+  bool get isMember => state == 'member';
+  bool get isPending => state == 'pending';
+  bool get runsIt => role == 'admin' || role == 'moderator';
+}
+
+/// Somebody in a forum, or waiting to be.
+class ForumMember {
+  const ForumMember({
+    required this.id,
+    required this.userId,
+    required this.name,
+    this.handle,
+    this.state,
+    this.role,
+    this.requestNote,
+    this.requestedAt,
+    this.suspendedUntil,
+    this.avatarUrl,
+  });
+
+  factory ForumMember.fromJson(Map<String, dynamic> json) => ForumMember(
+    id: Json.str(json, 'id'),
+    userId: Json.str(json, 'user_id'),
+    name: Json.str(json, 'name', fallback: 'A member'),
+    handle: Json.strOrNull(json, 'handle'),
+    state: Json.strOrNull(json, 'state'),
+    role: Json.strOrNull(json, 'role'),
+    requestNote: Json.strOrNull(json, 'request_note'),
+    requestedAt: Json.strOrNull(json, 'requested_at'),
+    suspendedUntil: Json.strOrNull(json, 'suspended_until'),
+    avatarUrl: Json.strOrNull(json, 'avatar_url'),
+  );
+
+  final String id;
+  final String userId;
+  final String name;
+  final String? handle;
+  final String? state;
+  final String? role;
+  final String? requestNote;
+  final String? requestedAt;
+  final String? suspendedUntil;
+  final String? avatarUrl;
+
+  bool get runsIt => role == 'admin' || role == 'moderator';
+  bool get isSuspended => state == 'suspended';
 }

@@ -1,4 +1,5 @@
 import '../core/config/app_config.dart';
+import '../models/content_status.dart';
 import '../models/forum.dart';
 import '../services/api/api_client.dart';
 import '../services/api/api_response.dart';
@@ -35,6 +36,62 @@ class ForumRepository {
         .whereType<Map<String, dynamic>>()
         .map(ForumSpace.fromJson)
         .toList(growable: false);
+  }
+
+  // -------------------------------------------------------------------------
+  // Membership
+  // -------------------------------------------------------------------------
+
+  /// Every forum, and where this member stands in each.
+  Future<List<MyForum>> myForums() async {
+    final Map<String, dynamic> data = await _api.get('/api/forums/mine');
+    return Json.objectList(data, 'items').map(MyForum.fromJson).toList(growable: false);
+  }
+
+  /// Asks to join. Nothing is granted here — a forum admin decides.
+  Future<String> requestToJoin(String space, {String? note}) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/forums/$space/join',
+      body: <String, dynamic>{'note': ?note},
+    );
+    return Json.str(data, 'message', fallback: 'Your request has been sent.');
+  }
+
+  Future<String> leaveForum(String space) async {
+    final Map<String, dynamic> data = await _api.post('/api/forums/$space/leave');
+    return Json.str(data, 'message', fallback: 'You have left the forum.');
+  }
+
+  /// The roster and the queue, for a forum's own administrators.
+  Future<({List<ForumMember> members, List<ForumMember> pending})> forumMembers(
+    String space,
+  ) async {
+    final Map<String, dynamic> data = await _api.get('/api/forums/$space/members');
+    return (
+      members: Json.objectList(data, 'members').map(ForumMember.fromJson).toList(growable: false),
+      pending: Json.objectList(data, 'pending').map(ForumMember.fromJson).toList(growable: false),
+    );
+  }
+
+  /// Approve, reject, remove, suspend, restore, or change somebody's role.
+  Future<String> decideMembership(
+    String space,
+    String userId, {
+    required String action,
+    String? note,
+    String? role,
+    String? until,
+  }) async {
+    final Map<String, dynamic> data = await _api.post(
+      '/api/forums/$space/members/$userId/decide',
+      body: <String, dynamic>{
+        'action': action,
+        'note': ?note,
+        'role': ?role,
+        'until': ?until,
+      },
+    );
+    return Json.str(data, 'message', fallback: 'Done.');
   }
 
   /// One space, with its shelves and its conversations.

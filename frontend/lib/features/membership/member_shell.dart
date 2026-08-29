@@ -41,6 +41,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/brand_logo.dart';
+import '../../core/widgets/header_inbox.dart';
 import '../../core/widgets/seo_head.dart';
 import '../../repositories/message_repository.dart';
 import '../../services/auth/auth_controller.dart';
@@ -787,7 +788,11 @@ class _TopBar extends StatelessWidget {
             const Spacer(),
           const SizedBox(width: AppSpacing.lg),
           ...actions,
-          const SizedBox(width: AppSpacing.md),
+          // The bell and the chat icon, each with its own count. A
+          // notification is something that happened to you; a message is
+          // somebody waiting for an answer.
+          const HeaderInbox(),
+          const SizedBox(width: AppSpacing.sm),
           _Avatar(name: auth.user?.displayName ?? 'Member'),
         ],
       ),

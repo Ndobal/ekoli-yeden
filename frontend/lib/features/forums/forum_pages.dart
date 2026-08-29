@@ -37,8 +37,15 @@ import '../../services/auth/auth_controller.dart';
 /// **Two of the three spaces may contain minors,** so their pages are marked
 /// `noindex` from the flag the server sends, in addition to the server refusing
 /// their contents to anonymous callers.
-class ForumsIndexPage extends StatelessWidget {
+class ForumsIndexPage extends StatefulWidget {
   const ForumsIndexPage({super.key});
+
+  @override
+  State<ForumsIndexPage> createState() => _ForumsIndexPageState();
+}
+
+class _ForumsIndexPageState extends State<ForumsIndexPage> {
+  int _reloads = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +69,7 @@ class ForumsIndexPage extends StatelessWidget {
             'happened — and what is said here stays where the next person can find it, '
             'rather than scrolling away in a group chat.',
         child: AsyncContent<List<ForumSpace>>(
+          key: ValueKey<int>(_reloads),
           load: repository.spaces,
           loadingMessage: 'Opening the forums…',
           isEmpty: (List<ForumSpace> spaces) => spaces.isEmpty,
@@ -79,7 +87,12 @@ class ForumsIndexPage extends StatelessWidget {
                 const _SignedOutNotice(),
                 const Gap.xl(),
               ],
-              ...spaces.map((ForumSpace space) => _SpaceCard(space: space)),
+              ...spaces.map(
+                (ForumSpace space) => _SpaceCard(
+                  space: space,
+                  onChanged: () => setState(() => _reloads += 1),
+                ),
+              ),
               const Gap.xxl(),
               const _HouseRules(),
             ],
@@ -139,9 +152,12 @@ class _SignedOutNotice extends StatelessWidget {
 
 /// One space on the index.
 class _SpaceCard extends StatelessWidget {
-  const _SpaceCard({required this.space});
+  const _SpaceCard({required this.space, required this.onChanged});
 
   final ForumSpace space;
+
+  /// Asking to join changes what this card should say, so the list reloads.
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -266,13 +282,8 @@ class _SpaceCard extends StatelessWidget {
                           const Gap.lg(),
                           _BlockedNote(reason: space.blockedReason!, canRead: open),
                         ],
-                        if (open) ...<Widget>[
-                          const Gap.lg(),
-                          FilledButton.tonal(
-                            onPressed: () => context.go(AppRoutes.forumSpace(space.slug)),
-                            child: Text('Open ${space.name}'),
-                          ),
-                        ],
+                        const Gap.lg(),
+                        _SpaceAction(space: space, onChanged: onChanged),
                       ],
                     ),
                   ),
@@ -1005,6 +1016,175 @@ class ForumAvatar extends StatelessWidget {
 }
 
 /// A small labelled fact.
+/// THE ONE CONTROL A SPACE CARD NEEDS.
+///
+/// Which control depends entirely on where the reader stands, and getting that
+/// wrong is worse than showing nothing: a "Join" button on a forum somebody was
+/// turned away from invites them to be refused twice.
+///
+///   not signed in      → sign in
+///   the General Forum  → nothing; everybody is already in it
+///   a member           → open it
+///   waiting            → say so, and that it is with the administrators
+///   turned away        → say so, with the reason if one was given
+///   closed             → say that it is not open to requests
+///   otherwise          → ask to join
+class _SpaceAction extends StatefulWidget {
+  const _SpaceAction({required this.space, required this.onChanged});
+
+  final ForumSpace space;
+  final VoidCallback onChanged;
+
+  @override
+  State<_SpaceAction> createState() => _SpaceActionState();
+}
+
+class _SpaceActionState extends State<_SpaceAction> {
+  bool _busy = false;
+  String? _notice;
+
+  Future<void> _join() async {
+    final String? note = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => _JoinDialog(space: widget.space),
+    );
+    if (note == null || !mounted) return;
+
+    final ForumRepository repository = context.read<ForumRepository>();
+    setState(() => _busy = true);
+    try {
+      final String message = await repository.requestToJoin(
+        widget.space.slug,
+        note: note.isEmpty ? null : note,
+      );
+      if (mounted) setState(() => _notice = message);
+      widget.onChanged();
+    } on AppException catch (error) {
+      if (mounted) setState(() => _notice = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ForumSpace space = widget.space;
+    final bool signedIn = context.watch<AuthController>().isSignedIn;
+
+    if (_notice != null) {
+      return Text(
+        _notice!,
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+
+    if (!signedIn) {
+      return TextButton.icon(
+        onPressed: () => context.go(AppRoutes.signInReturningTo(AppRoutes.forums)),
+        icon: const Icon(Icons.login, size: 16),
+        label: const Text('Sign in to take part'),
+      );
+    }
+
+    if (space.isMember || space.isDefault) {
+      return FilledButton.tonalIcon(
+        onPressed: () => context.go(AppRoutes.forumSpace(space.slug)),
+        icon: const Icon(Icons.arrow_forward, size: 16),
+        label: Text(space.isDefault ? 'Open — everybody is here' : 'Open'),
+      );
+    }
+
+    if (space.isPending) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(Icons.schedule, size: 15),
+          const Gap.hSm(),
+          Text('Waiting on the administrators', style: theme.textTheme.bodySmall),
+        ],
+      );
+    }
+
+    if (space.wasRejected) {
+      return Text(
+        space.blockedReason ?? 'Your request was not accepted.',
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+      );
+    }
+
+    if (space.joinPolicy == 'closed') {
+      return Text(
+        'Not open to requests — its administrators add people themselves.',
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+
+    return FilledButton.icon(
+      onPressed: _busy ? null : _join,
+      icon: const Icon(Icons.group_add_outlined, size: 16),
+      label: Text('Ask to join ${space.name}'),
+    );
+  }
+}
+
+class _JoinDialog extends StatefulWidget {
+  const _JoinDialog({required this.space});
+
+  final ForumSpace space;
+
+  @override
+  State<_JoinDialog> createState() => _JoinDialogState();
+}
+
+class _JoinDialogState extends State<_JoinDialog> {
+  final TextEditingController _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Ask to join ${widget.space.name}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'The forum’s administrators will see who is asking and decide. You can say a word '
+            'about why you would like to join — it is what they actually decide on.',
+          ),
+          const Gap.lg(),
+          TextField(
+            controller: _note,
+            maxLength: 500,
+            maxLines: 3,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Why you would like to join (optional)',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_note.text.trim()),
+          child: const Text('Send the request'),
+        ),
+      ],
+    );
+  }
+}
+
 class _MetaChip extends StatelessWidget {
   const _MetaChip({required this.icon, required this.label, this.emphasis = false});
 

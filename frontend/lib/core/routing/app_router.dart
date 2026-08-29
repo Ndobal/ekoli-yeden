@@ -18,6 +18,8 @@ import '../../features/events/events_pages.dart';
 import '../../features/forums/forum_moderation_page.dart';
 import '../../features/forums/forum_new_topic_page.dart';
 import '../../features/forums/forum_pages.dart';
+import '../../features/forums/forum_members_page.dart';
+import '../../features/community/community_hub_page.dart';
 import '../../features/forums/forum_topic_page.dart';
 import '../../features/gallery/gallery_pages.dart';
 import '../../features/groups/group_workspace_pages.dart';
@@ -462,7 +464,13 @@ GoRouter buildRouter(AuthController auth) {
             builder: (_, GoRouterState state) =>
                 ForumSpacePage(slug: state.pathParameters['space']!),
             routes: <RouteBase>[
-              // Likewise before `:topic`.
+              // Static sub-paths before `:topic`, or a conversation whose slug
+              // happened to be "members" would shadow the roster.
+              GoRoute(
+                path: 'members',
+                builder: (_, GoRouterState state) =>
+                    ForumMembersPage(space: state.pathParameters['space']!),
+              ),
               GoRoute(
                 path: 'new',
                 builder: (_, GoRouterState state) =>
@@ -556,6 +564,10 @@ GoRouter buildRouter(AuthController auth) {
       ),
 
       // --- The Yakoli directory (Module 7) ---------------------------------
+      GoRoute(
+        path: AppRoutes.communityHub,
+        builder: (_, _) => const CommunityHubPage(),
+      ),
       GoRoute(
         path: AppRoutes.directory,
         builder: (_, _) => const DirectoryPage(),

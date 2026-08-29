@@ -126,6 +126,11 @@ class AppRoutes {
   static const String join = '/join';
   static const String directory = '/directory';
 
+  /// The community hub — who is here, what has happened, what the archive
+  /// holds. `/community` is the development projects inside News, so this has
+  /// its own address rather than fighting for that one.
+  static const String communityHub = '/the-community';
+
   /// Yakoli Opportunities — jobs, scholarships, training and grants.
   ///
   /// Signed-in only, because the feature IS the matching and there is nothing
@@ -148,6 +153,9 @@ class AppRoutes {
   /// registered ahead of `/community/forums/:space` in the router — a space
   /// whose slug happened to be "moderation" would otherwise shadow it.
   static const String forumModeration = '/community/forums/moderation';
+
+  /// A forum's own administration: its requests and its roster.
+  static String forumMembers(String space) => '$forums/$space/members';
 
   // --- Account --------------------------------------------------------------
   static const String signIn = '/sign-in';
@@ -438,6 +446,11 @@ const List<NavItem> fallbackPrimaryNavigation = <NavItem>[
     label: 'News',
     path: AppRoutes.news,
     description: 'Announcements, events and community projects',
+  ),
+  NavItem(
+    label: 'Community',
+    path: AppRoutes.communityHub,
+    description: 'Who is here, the forums, and what has happened lately',
   ),
   NavItem(
     label: 'Gallery',
