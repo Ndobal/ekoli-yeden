@@ -447,6 +447,19 @@ class _SidebarState extends State<_Sidebar> {
                     ),
                     const Gap.sm(),
                   ],
+                  // The way back to your own account.
+                  //
+                  // A workspace used to offer "View site" and sign out, and
+                  // nothing else — so somebody who had switched into
+                  // Administration could reach the public website or leave, but
+                  // not return to their own dashboard. The switcher in the
+                  // member sidebar goes one way; this is the other.
+                  TextButton.icon(
+                    onPressed: () => context.go(AppRoutes.account),
+                    icon: const Icon(Icons.person_outline, size: 16),
+                    label: const Text('My account'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  ),
                   Row(
                     children: <Widget>[
                       TextButton.icon(

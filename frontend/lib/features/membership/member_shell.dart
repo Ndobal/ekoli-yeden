@@ -403,6 +403,20 @@ class _SidebarState extends State<_Sidebar> {
               ),
             ),
 
+            // SWITCHING BETWEEN WHAT YOU ARE AND WHAT YOU DO.
+            //
+            // Somebody who holds a role has two lives here: their own account,
+            // and the workspace they were given. This used to be two rows at
+            // the foot of eleven, which on a phone meant scrolling past the
+            // whole of your personal area to reach the thing you signed in to
+            // do — and left a Super Admin reasonably asking where the
+            // administration area had gone.
+            //
+            // At the top, before anything else, and only for the few who have
+            // somewhere to switch to.
+            if (auth.canAccessEditorial || auth.canAccessAdmin)
+              _WorkspaceSwitcher(closeOnTap: closeOnTap, location: location),
+
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -418,40 +432,6 @@ class _SidebarState extends State<_Sidebar> {
                       },
                     ),
 
-                  // The workspaces, for the few members who also hold a role.
-                  // Shown only when they do, so an ordinary member's sidebar
-                  // stays the length it should be.
-                  if (auth.canAccessEditorial || auth.canAccessAdmin) ...<Widget>[
-                    const _SidebarDivider(),
-                    if (auth.canAccessEditorial)
-                      _NavRow(
-                        item: const MemberNavItem(
-                          label: 'Editorial',
-                          path: AppRoutes.editorialDashboard,
-                          icon: Icons.edit_note_outlined,
-                        ),
-                        badge: 0,
-                        selected: location.startsWith('/editorial'),
-                        onTap: () {
-                          if (closeOnTap) Navigator.of(context).pop();
-                          context.go(AppRoutes.editorialDashboard);
-                        },
-                      ),
-                    if (auth.canAccessAdmin)
-                      _NavRow(
-                        item: const MemberNavItem(
-                          label: 'Administration',
-                          path: AppRoutes.adminDashboard,
-                          icon: Icons.shield_outlined,
-                        ),
-                        badge: 0,
-                        selected: location.startsWith('/admin'),
-                        onTap: () {
-                          if (closeOnTap) Navigator.of(context).pop();
-                          context.go(AppRoutes.adminDashboard);
-                        },
-                      ),
-                  ],
                 ],
               ),
             ),
@@ -509,6 +489,147 @@ class _SidebarState extends State<_Sidebar> {
   static bool _isSelected(String location, String path) {
     if (path == AppRoutes.account) return location == AppRoutes.account;
     return location == path || location.startsWith('$path/');
+  }
+}
+
+/// WHERE A MEMBER WITH A ROLE CHANGES HATS.
+///
+/// Three areas at most, and everybody sees only the ones that are theirs:
+///
+///   My account     — always
+///   Editorial      — anybody who may write or review
+///   Administration — users, roles, settings, audit
+///
+/// Presented as one control rather than three more rows in the navigation,
+/// because switching workspace is a different kind of act from opening a page:
+/// it changes what the whole sidebar means.
+class _WorkspaceSwitcher extends StatelessWidget {
+  const _WorkspaceSwitcher({required this.closeOnTap, required this.location});
+
+  final bool closeOnTap;
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final AuthController auth = context.watch<AuthController>();
+    final ThemeData theme = Theme.of(context);
+
+    final bool inEditorial = location.startsWith('/editorial');
+    final bool inAdmin = location.startsWith('/admin');
+
+    void go(String path) {
+      if (closeOnTap) Navigator.of(context).pop();
+      context.go(path);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.lg,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.10),
+          borderRadius: AppRadius.mdAll,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.xs,
+                AppSpacing.sm,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'YOU ARE WORKING IN',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.62),
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _SwitcherRow(
+              label: 'My account',
+              icon: Icons.person_outline,
+              selected: !inEditorial && !inAdmin,
+              onTap: () => go(AppRoutes.account),
+            ),
+            if (auth.canAccessEditorial)
+              _SwitcherRow(
+                label: 'Editorial',
+                icon: Icons.edit_note_outlined,
+                selected: inEditorial,
+                onTap: () => go(AppRoutes.editorialDashboard),
+              ),
+            if (auth.canAccessAdmin)
+              _SwitcherRow(
+                label: 'Administration',
+                icon: Icons.shield_outlined,
+                selected: inAdmin,
+                onTap: () => go(AppRoutes.adminDashboard),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwitcherRow extends StatelessWidget {
+  const _SwitcherRow({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.gold : Colors.transparent,
+      borderRadius: AppRadius.smAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.smAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(icon, size: 17, color: Colors.white),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (selected)
+                const Icon(Icons.check, size: 15, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

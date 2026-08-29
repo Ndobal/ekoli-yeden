@@ -601,10 +601,12 @@ class _Footer extends StatelessWidget {
     final List<NavItem> secondary = context.watch<CmsController>().footerNavigationOrFallback;
     final bool wide = context.screenWidth >= Breakpoints.tablet;
 
-    // Two link columns on a wide screen, stacked on a phone. Splitting the
-    // primary menu keeps each column a readable length rather than one long run.
-    final List<NavItem> explore = primary.where((NavItem item) => !item.isCta).toList();
-    final int half = (explore.length / 2).ceil();
+    // Grouped by what things are — see `_footerGroups`. Anything the CMS offers
+    // that no group claims still appears, under "More".
+    final List<NavItem> archive = _footerItems('The archive', primary);
+    final List<NavItem> community = _footerItems('The community', primary);
+    final List<NavItem> takePart = _footerItems('Take part', primary);
+    final List<NavItem> more = _footerRemainder(primary, secondary);
 
     final Widget brandBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -665,34 +667,29 @@ class _Footer extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Expanded(flex: 5, child: brandBlock),
+                  Expanded(flex: 4, child: brandBlock),
                   const SizedBox(width: AppSpacing.xxl),
+                  Expanded(flex: 2, child: _FooterColumn(heading: 'The archive', items: archive)),
                   Expanded(
                     flex: 2,
-                    child: _FooterColumn(
-                      heading: 'Explore',
-                      items: explore.take(half).toList(),
-                    ),
+                    child: _FooterColumn(heading: 'The community', items: community),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: _FooterColumn(
-                      heading: 'The archive',
-                      items: explore.skip(half).toList(),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: _FooterColumn(heading: 'More', items: secondary),
-                  ),
+                  Expanded(flex: 2, child: _FooterColumn(heading: 'Take part', items: takePart)),
+                  Expanded(flex: 2, child: _FooterColumn(heading: 'More', items: more)),
                 ],
               )
             else ...<Widget>[
               brandBlock,
               const Gap.xxl(),
-              _FooterColumn(heading: 'Explore', items: explore),
+              // On a phone the groups stack in the order somebody is most
+              // likely to want them, rather than all four at full length.
+              _FooterColumn(heading: 'The archive', items: archive),
               const Gap.xl(),
-              _FooterColumn(heading: 'More', items: secondary),
+              _FooterColumn(heading: 'The community', items: community),
+              const Gap.xl(),
+              _FooterColumn(heading: 'Take part', items: takePart),
+              const Gap.xl(),
+              _FooterColumn(heading: 'More', items: more),
             ],
 
             if (settings.contactEmail != null ||
@@ -799,6 +796,94 @@ class _Footer extends StatelessWidget {
       ),
     );
   }
+}
+
+/// THE FOOTER'S COLUMNS, GROUPED BY WHAT THINGS ARE.
+///
+/// They used to be the top navigation cut in half — the first seven items in
+/// one column under "Explore" and the rest under "The archive". Those headings
+/// described nothing, the split moved every time a section was added, and with
+/// fourteen entries it had become two long unbalanced lists of everything.
+///
+/// A footer is a site map. So these are written down, in groups a reader would
+/// recognise, and a section only appears in the one it belongs to.
+///
+/// Anything in the navigation that is not listed here still reaches the footer,
+/// under "More" — so a section added by the community through the CMS is never
+/// silently dropped.
+const Map<String, List<String>> _footerGroups = <String, List<String>>{
+  'The archive': <String>[
+    AppRoutes.history,
+    AppRoutes.culture,
+    AppRoutes.language,
+    AppRoutes.stories,
+    AppRoutes.voices,
+    AppRoutes.gallery,
+  ],
+  'The community': <String>[
+    AppRoutes.people,
+    AppRoutes.news,
+    AppRoutes.festivals,
+    AppRoutes.map,
+    AppRoutes.learn,
+  ],
+  'Take part': <String>[
+    AppRoutes.join,
+    AppRoutes.contribute,
+    AppRoutes.contributePerson,
+    AppRoutes.directory,
+    AppRoutes.opportunities,
+  ],
+};
+
+/// The label a path should carry in the footer, preferring what the CMS calls
+/// it so a community rename reaches here too.
+String _footerLabel(String path, List<NavItem> navigation) {
+  for (final NavItem item in navigation) {
+    if (item.path == path) return item.label;
+  }
+  return const <String, String>{
+    AppRoutes.history: 'History',
+    AppRoutes.culture: 'Culture',
+    AppRoutes.language: 'Language',
+    AppRoutes.stories: 'Stories and folklore',
+    AppRoutes.voices: 'Voices of Ekori',
+    AppRoutes.gallery: 'Photographs and film',
+    AppRoutes.people: 'People of Ekoli-Yeden',
+    AppRoutes.news: 'News and announcements',
+    AppRoutes.festivals: 'Festivals',
+    AppRoutes.map: 'Discover Ekori',
+    AppRoutes.learn: 'For children',
+    AppRoutes.join: 'Join the community',
+    AppRoutes.contribute: 'Send in material',
+    AppRoutes.contributePerson: 'Add somebody to the archive',
+    AppRoutes.directory: 'Member directory',
+    AppRoutes.opportunities: 'Opportunities',
+  }[path] ??
+      path;
+}
+
+List<NavItem> _footerItems(String heading, List<NavItem> navigation) {
+  return <NavItem>[
+    for (final String path in _footerGroups[heading] ?? const <String>[])
+      NavItem(label: _footerLabel(path, navigation), path: path),
+  ];
+}
+
+/// Whatever the CMS offers that none of the groups above claims.
+List<NavItem> _footerRemainder(List<NavItem> navigation, List<NavItem> secondary) {
+  final Set<String> claimed = <String>{
+    for (final List<String> group in _footerGroups.values) ...group,
+    AppRoutes.home,
+    AppRoutes.about,
+    AppRoutes.messages,
+  };
+  return <NavItem>[
+    const NavItem(label: 'About this archive', path: AppRoutes.about),
+    for (final NavItem item in navigation)
+      if (!item.isCta && !claimed.contains(item.path)) item,
+    ...secondary,
+  ];
 }
 
 /// One column of footer links.

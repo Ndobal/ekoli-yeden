@@ -91,14 +91,23 @@ export async function eventsCalendar(context: RequestContext): Promise<Response>
         // A festival is named `name`, not `title`, and carries a `year` that
         // an event does not. Aliased here rather than special-cased below, so
         // the merge downstream sees one shape.
-        `SELECT f."id", f."slug", f."name" AS title, f."description", f."theme", f."year",
-                f."start_date", f."end_date", f."location", f."cover_media_id",
+        // A festival no longer carries a year or a date — its albums do. So the
+        // calendar reads the most recent album for the year and the dates, and
+        // the festival for everything that does not change from year to year.
+        `SELECT f."id", f."slug", f."name" AS title, f."description",
+                f."short_description" AS theme, f."location", f."cover_media_id",
                 f."banner_media_id", f."flier_media_id",
-                g."slug" AS gallery_slug
+                g."slug" AS gallery_slug, g."year", g."event_date" AS start_date,
+                g."event_date" AS end_date
          FROM "festivals" f
-         LEFT JOIN "galleries" g ON g."festival_id" = f."id" AND g."status" = 'published'
+         LEFT JOIN "galleries" g ON g."id" = (
+           SELECT gg."id" FROM "galleries" gg
+           WHERE gg."festival_id" = f."id" AND gg."status" = 'published'
+           ORDER BY gg."year" IS NULL, gg."year" DESC
+           LIMIT 1
+         )
          WHERE f."status" = 'published'
-         ORDER BY f."year" DESC`,
+         ORDER BY g."year" IS NULL, g."year" DESC`,
       )
       .bind(),
   ]);

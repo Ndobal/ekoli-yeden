@@ -187,18 +187,27 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     table: 'festivals',
     label: 'Festival',
     slugColumn: 'slug',
+    // A festival is the permanent parent record — Leboku, not Leboku 2026.
+    // Each year's celebration is a gallery carrying `festival_id` and `year`,
+    // so `year`, `start_date`, `programme` and `gallery_id` are no longer
+    // properties of this row. See migration 0036.
     writableColumns: [
-      'slug', 'name', 'full_name', 'year', 'theme', 'tagline', 'description',
-      'start_date', 'end_date', 'location', 'programme', 'sponsors',
-      'announcements', 'committee', 'cover_media_id', 'logo_media_id',
-      'gallery_id', 'is_archived', 'is_featured',
+      'slug', 'name', 'full_name', 'tagline',
+      'short_description', 'description', 'origin_significance',
+      'cultural_significance', 'usually_celebrated', 'youtube_video_id',
+      'location', 'place_id', 'committee', 'sponsors',
+      'cover_media_id', 'logo_media_id', 'banner_media_id', 'flier_media_id',
+      'is_archived', 'is_featured', 'sort_order',
       'seo_title', 'seo_description', 'seo_image_media_id', 'status',
     ],
     publicColumns: null,
-    searchableColumns: ['name', 'full_name', 'theme', 'tagline', 'description', 'location'],
-    sortableColumns: ['year', 'name', 'start_date', ...AUDIT_COLUMNS],
-    defaultSort: 'year',
-    defaultOrder: 'DESC',
+    searchableColumns: [
+      'name', 'full_name', 'tagline', 'short_description', 'description',
+      'origin_significance', 'cultural_significance', 'location',
+    ],
+    sortableColumns: ['name', 'sort_order', ...AUDIT_COLUMNS],
+    defaultSort: 'sort_order',
+    defaultOrder: 'ASC',
     managedBy: LEBOKU,
     hasVerification: false,
     searchable: true,
@@ -260,7 +269,12 @@ export const CONTENT_RESOURCES: Record<string, ContentResource> = {
     slugColumn: 'slug',
     writableColumns: [
       'slug', 'title', 'description', 'category', 'event_date', 'location',
-      'festival_id', 'event_id', 'cover_media_id', 'sort_order',
+      // `festival_id` + `year` are what make an album a year of a festival.
+      // One record: the Gallery lists it like any album and the festival page
+      // groups the same rows by year, so a photograph added in either place is
+      // in both and neither can drift.
+      'festival_id', 'year', 'programme', 'people_featured', 'is_festival_gallery',
+      'event_id', 'place_id', 'cover_media_id', 'sort_order',
       'seo_title', 'seo_description', 'status',
     ],
     publicColumns: null,

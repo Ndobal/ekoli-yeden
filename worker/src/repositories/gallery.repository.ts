@@ -243,6 +243,47 @@ export class GalleryRepository {
   }
 
   /** The album a festival's photographs default into. */
+  /**
+   * Every year of a festival, newest first, with what each album holds.
+   *
+   * This is the festival archive: 2026, 2025, 2024. Each row is an ordinary
+   * gallery — the same record the Gallery section lists — so a photograph
+   * added in either place appears in both and the two cannot disagree.
+   *
+   * Counts are split by kind because "12 photographs and 3 films" is what
+   * somebody deciding whether to open a year actually wants to know.
+   */
+  async albumsForFestival(
+    festivalId: string,
+    statuses: string[] = ['published'],
+  ): Promise<Record<string, unknown>[]> {
+    const placeholders = statuses.map(() => '?').join(', ');
+    const result = await this.db
+      .prepare(
+        `SELECT g."id", g."slug", g."title", g."description", g."year",
+                g."event_date", g."location", g."programme", g."people_featured",
+                g."status", m."storage_key" AS cover_key,
+                (SELECT COUNT(*) FROM "gallery_items" gi
+                  INNER JOIN "media_assets" ma ON ma."id" = gi."media_asset_id"
+                  WHERE gi."gallery_id" = g."id" AND gi."status" = 'published'
+                    AND ma."mime_type" LIKE 'image/%') AS photo_count,
+                (SELECT COUNT(*) FROM "gallery_items" gi
+                  INNER JOIN "media_assets" ma ON ma."id" = gi."media_asset_id"
+                  WHERE gi."gallery_id" = g."id" AND gi."status" = 'published'
+                    AND ma."mime_type" LIKE 'video/%') AS video_count,
+                (SELECT COUNT(*) FROM "videos" v
+                  WHERE v."related_festival_id" = g."festival_id"
+                    AND v."status" = 'published') AS linked_video_count
+         FROM "galleries" g
+         LEFT JOIN "media_assets" m ON m."id" = g."cover_media_id"
+         WHERE g."festival_id" = ? AND g."status" IN (${placeholders})
+         ORDER BY g."year" IS NULL, g."year" DESC, g."created_at" DESC`,
+      )
+      .bind(festivalId, ...statuses)
+      .all<Record<string, unknown>>();
+    return result.results ?? [];
+  }
+
   async findPrimaryForFestival(festivalId: string): Promise<GalleryRecord | null> {
     const row = await this.db
       .prepare(

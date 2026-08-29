@@ -65,10 +65,13 @@ export async function showFestival(context: RequestContext): Promise<Response> {
   const festival = await resolveFestival(context, identifier);
 
   const festivalId = String(festival['id']);
-  const [events, videos, gallery] = await Promise.all([
+  const [events, videos, gallery, albums] = await Promise.all([
     loadEvents(context.env.DB, festivalId),
     loadVideos(context.env.DB, festivalId),
     loadGallery(context, festival),
+    // The festival archive: every year, newest first. Each is an ordinary
+    // gallery, so the Gallery section lists the same records.
+    new GalleryService(context.env).repo.albumsForFestival(festivalId),
   ]);
 
   return json(
@@ -87,6 +90,25 @@ export async function showFestival(context: RequestContext): Promise<Response> {
       // gallery, the same pictures also reach the main Gallery section.
       gallery_id: gallery.id,
       gallery_slug: gallery.slug,
+
+      // Year by year — 2026, 2025, 2024 — which is what makes this a heritage
+      // archive rather than a page about the most recent celebration.
+      albums: albums.map((album) => ({
+        id: album['id'],
+        slug: album['slug'],
+        title: album['title'],
+        description: album['description'],
+        year: album['year'],
+        event_date: album['event_date'],
+        location: album['location'],
+        programme: album['programme'],
+        people_featured: album['people_featured'],
+        photo_count: Number(album['photo_count'] ?? 0),
+        video_count: Number(album['video_count'] ?? 0),
+        cover_url: album['cover_key']
+          ? publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, String(album['cover_key']))
+          : null,
+      })),
     },
     { headers: publicCacheHeaders() },
   );
@@ -137,39 +159,62 @@ async function decorateFestival(
 }
 
 /**
- * `GET /api/leboku` — the festival series, newest first.
+ * `GET /api/leboku` — the festival and every year of it, newest first.
  *
- * Kept distinct from `/api/festivals` so the client can link straight to
- * `/leboku/<year>` without needing to know a slug.
+ * WHAT AN "EDITION" IS NOW.
+ *
+ * It used to be a row in `festivals`: Leboku 2026 and Leboku 2025 were two
+ * unrelated festivals that happened to share a name, and the history of the
+ * festival had to be retold in each or lost. Since 0036 a festival is the
+ * permanent parent and each year is an album — an ordinary gallery carrying
+ * `festival_id` and `year`.
+ *
+ * So the editions here are albums. The shape of the response is unchanged for
+ * anything that was reading it: an id, a slug, a year, a title.
+ *
+ * Kept distinct from `/api/festivals` so a client can link straight to a year
+ * without knowing a slug.
  */
 export async function lebokuIndex(context: RequestContext): Promise<Response> {
-  const { items, total } = await listRecords<Record<string, unknown>>(context.env.DB, 'festivals', {
+  const { items } = await listRecords<Record<string, unknown>>(context.env.DB, 'festivals', {
     status: PUBLIC_STATUSES,
     filters: { name: 'Leboku' },
-    sortColumn: 'year',
-    sortDirection: 'DESC',
-    limit: 100,
+    sortColumn: 'sort_order',
+    sortDirection: 'ASC',
+    limit: 1,
     offset: 0,
   });
 
-  // Falls back to every festival if none is named "Leboku" yet — the record is
-  // created by the Leboku Manager, not by this code.
-  const editions = items.length > 0 ? items : await allFestivals(context.env.DB);
+  // Falls back to the first festival on record if none is named "Leboku" — the
+  // record is created by the Leboku Manager, not by this code.
+  const festival = items[0] ?? (await allFestivals(context.env.DB))[0] ?? null;
+
+  if (!festival) {
+    return json({ festival: 'Leboku', editions: [], total: 0 }, { headers: publicCacheHeaders() });
+  }
+
+  const albums = await new GalleryService(context.env).repo.albumsForFestival(
+    String(festival['id']),
+  );
 
   return json(
     {
-      festival: 'Leboku',
-      editions: editions.map((row) => ({
-        id: row['id'],
-        slug: row['slug'],
-        name: row['name'],
-        year: row['year'],
-        theme: row['theme'],
-        start_date: row['start_date'],
-        end_date: row['end_date'],
-        is_archived: row['is_archived'],
+      festival: festival['name'] ?? 'Leboku',
+      festival_slug: festival['slug'],
+      editions: albums.map((album) => ({
+        id: album['id'],
+        slug: album['slug'],
+        name: album['title'],
+        year: album['year'],
+        location: album['location'],
+        event_date: album['event_date'],
+        photo_count: Number(album['photo_count'] ?? 0),
+        video_count: Number(album['video_count'] ?? 0),
+        cover_url: album['cover_key']
+          ? publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, String(album['cover_key']))
+          : null,
       })),
-      total: items.length > 0 ? total : editions.length,
+      total: albums.length,
     },
     { headers: publicCacheHeaders() },
   );
@@ -178,8 +223,8 @@ export async function lebokuIndex(context: RequestContext): Promise<Response> {
 async function allFestivals(db: D1Database): Promise<Record<string, unknown>[]> {
   const { items } = await listRecords<Record<string, unknown>>(db, 'festivals', {
     status: PUBLIC_STATUSES,
-    sortColumn: 'year',
-    sortDirection: 'DESC',
+    sortColumn: 'sort_order',
+    sortDirection: 'ASC',
     limit: 100,
     offset: 0,
   });
@@ -193,11 +238,25 @@ async function resolveFestival(
 ): Promise<Record<string, unknown>> {
   const db = context.env.DB;
 
+  // A four-digit identifier is a YEAR, and a year is no longer a property of a
+  // festival — it is a property of one of its albums. `/leboku/2026` therefore
+  // means "the festival that has a 2026 album", which is the festival page
+  // opened on that year.
+  //
+  // Links printed on a banner in 2026 keep resolving, which is the whole
+  // reason this branch survives the restructuring at all.
   if (/^\d{4}$/.test(identifier)) {
-    const byYear = await findRecordBy<Record<string, unknown>>(db, 'festivals', 'year', Number(identifier), {
-      status: PUBLIC_STATUSES,
-    });
-    if (byYear) return byYear;
+    const byAlbumYear = await db
+      .prepare(
+        `SELECT f.* FROM "festivals" f
+         INNER JOIN "galleries" g ON g."festival_id" = f."id"
+         WHERE g."year" = ? AND f."status" = 'published' AND g."status" = 'published'
+         ORDER BY f."sort_order"
+         LIMIT 1`,
+      )
+      .bind(Number(identifier))
+      .first<Record<string, unknown>>();
+    if (byAlbumYear) return byAlbumYear;
   }
 
   const service = new ContentService(db, FESTIVAL_RESOURCE);
@@ -332,7 +391,6 @@ export async function festivalGalleryIndex(context: RequestContext): Promise<Res
       festival_id: festival['id'],
       festival_name: festival['name'],
       festival_slug: festival['slug'],
-      year: festival['year'],
       festival_status: festival['status'],
       gallery_id: gallery.id,
       gallery_slug: gallery.slug,
