@@ -307,11 +307,25 @@ export async function logout(context: RequestContext): Promise<Response> {
 export async function me(context: RequestContext): Promise<Response> {
   if (!context.user) throw new UnauthorizedError('Please sign in to continue.');
 
-  // Whether this account has completed its Okoli membership travels with the
-  // identity rather than needing a request of its own. Contributing requires
-  // it, so the question is asked on pages that have no other reason to know
-  // anything about membership, and asking it here costs one indexed lookup on
-  // a call the client already makes.
+  // MEMBERSHIP HEALS ITSELF HERE.
+  //
+  // Registration creates the profile, and for a while nothing else did — so
+  // every account made before that, and every account an administrator
+  // creates, existed with no `member_profiles` row at all. Four of the first
+  // five accounts on this platform were in that state.
+  //
+  // An account without a profile is not a member, and the whole community
+  // surface is gated on membership: the members-only forum spaces read as
+  // locked, the directory offers to enrol you, and messaging is closed. The
+  // account looked signed in and behaved like a stranger.
+  //
+  // `ensureMembership` returns immediately when a profile exists, so this is
+  // one indexed lookup on a call the client already makes — and the gap closes
+  // on the next page load rather than needing anybody to sign up again.
+  await new MembershipService(context.env).ensureMembership(context.user, {
+    requestId: context.requestId,
+  });
+
   // The same shape as login and registration, from the same helper, so the
   // three can no longer disagree about whether somebody is a member.
   return json(
