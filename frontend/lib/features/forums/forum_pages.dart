@@ -176,22 +176,34 @@ class _SpaceCard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: AppRadius.lgAll,
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                // The accent stripe carries the space's identity at a glance,
-                // and goes grey when the door is shut.
-                Container(
+              border: Border(
+                top: BorderSide(color: theme.colorScheme.outlineVariant),
+                right: BorderSide(color: theme.colorScheme.outlineVariant),
+                bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+                // The space's identity at a glance, grey when the door is shut.
+                left: BorderSide(
+                  color: open ? accent : theme.colorScheme.outlineVariant,
                   width: 6,
-                  decoration: BoxDecoration(
-                    color: open ? accent : theme.colorScheme.outlineVariant,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(AppRadius.lg),
-                    ),
-                  ),
                 ),
+              ),
+            ),
+            // THE STRIPE IS A BORDER, NOT A CHILD.
+            //
+            // It used to be a fixed-width Container inside a Row with
+            // `CrossAxisAlignment.stretch`, so that it ran the full height of
+            // the card. Stretch asks every child to be exactly as tall as the
+            // Row — and the Row sits in a Column inside a scroll view, whose
+            // height is unbounded, so the constraint handed down was
+            // `h=Infinity`.
+            //
+            // That throws during layout, and a layout error takes the whole
+            // list with it: every card, on every account. The forums have been
+            // blank for that reason, not for any of the access rules.
+            //
+            // A left border does exactly the same job with no height to
+            // resolve, which is why it cannot come back.
+            child: Row(
+              children: <Widget>[
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.xl),

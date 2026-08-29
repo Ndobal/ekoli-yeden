@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -49,6 +50,15 @@ class _SignInPageState extends State<SignInPage> {
       email: _email.text.trim(),
       password: _password.text,
     );
+
+    // THIS is what makes the browser offer to remember the account.
+    //
+    // An `AutofillGroup` collects the fields; the browser only prompts to save
+    // once the group is told the credential is finished. Called on success
+    // only — asking somebody to save a password that was just rejected is how
+    // a wrong password ends up remembered.
+    if (success) TextInput.finishAutofillContext();
+
     if (!success || !mounted) return;
 
     // Editorial and administrative users land where they work; everybody else
@@ -70,7 +80,15 @@ class _SignInPageState extends State<SignInPage> {
       title: 'Sign in',
       subtitle: 'For members of the Preservation Team, the Editorial Team and administrators.',
       seoTitle: 'Sign in',
-      child: Form(
+      // THE BROWSER'S PASSWORD MANAGER NEEDS THE FIELDS GROUPED.
+      //
+      // Hints on their own tell the browser what each box is for. What makes it
+      // offer to SAVE the pair is an `AutofillGroup` that is then told the
+      // credential is complete — see `_signIn`. Without both, Chrome fills a
+      // remembered password and never offers to remember a new one, which is
+      // why the site appeared to forget accounts.
+      child: AutofillGroup(
+        child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,7 +96,8 @@ class _SignInPageState extends State<SignInPage> {
             TextFormField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
-              autofillHints: const <String>[AutofillHints.email],
+              autofillHints: const <String>[AutofillHints.email, AutofillHints.username],
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Email address'),
               validator: (String? value) =>
                   (value == null || value.trim().isEmpty) ? 'Enter your email address.' : null,
@@ -131,6 +150,7 @@ class _SignInPageState extends State<SignInPage> {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -166,6 +186,11 @@ class _RegisterPageState extends State<RegisterPage> {
           password: _password.text,
           displayName: _name.text.trim(),
         );
+
+    // Offering to save is most valuable here: somebody who has just invented a
+    // password is the person most likely to forget it.
+    if (success) TextInput.finishAutofillContext();
+
     if (success && mounted) setState(() => _done = true);
   }
 
@@ -204,13 +229,16 @@ class _RegisterPageState extends State<RegisterPage> {
       title: 'Create an account',
       subtitle: 'To contribute material to the archive and follow what happens to it.',
       seoTitle: 'Create an account',
-      child: Form(
+      child: AutofillGroup(
+        child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             TextFormField(
               controller: _name,
+              autofillHints: const <String>[AutofillHints.name],
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Your name'),
               validator: (String? value) => (value == null || value.trim().length < 2)
                   ? 'Please enter your name.'
@@ -220,6 +248,8 @@ class _RegisterPageState extends State<RegisterPage> {
             TextFormField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const <String>[AutofillHints.email, AutofillHints.username],
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Email address'),
               validator: (String? value) {
                 if (value == null || value.trim().isEmpty) return 'Enter your email address.';
@@ -231,6 +261,12 @@ class _RegisterPageState extends State<RegisterPage> {
             TextFormField(
               controller: _password,
               obscureText: true,
+              // `newPassword`, not `password`: it tells the browser to OFFER a
+              // strong one and to save what is typed, where `password` asks it
+              // to fill an existing credential into a form for a new account.
+              autofillHints: const <String>[AutofillHints.newPassword],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _register(),
               decoration: const InputDecoration(
                 labelText: 'Password',
                 helperText: 'At least six characters. A short phrase works well, and common passwords are refused.',
@@ -261,6 +297,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
