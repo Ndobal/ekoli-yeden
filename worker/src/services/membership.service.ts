@@ -1,5 +1,6 @@
 import { MemberRepository, type MemberProfileRecord } from '../repositories/member.repository';
 import { MessagingRepository } from '../repositories/messaging.repository';
+import { ForumRepository } from '../repositories/forum.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { UserRepository } from '../repositories/user.repository';
 import { SettingsRepository } from '../repositories/settings.repository';
@@ -95,6 +96,25 @@ export class MembershipService {
     // reason the profile is.
     const role = await this.users.findRoleBySlug('okoli_member');
     if (role) await this.users.assignRole(user.id, role.id, null);
+
+    // AND THE GENERAL FORUM, IN THE SAME ACT.
+    //
+    // Every registered person belongs to it from the moment they register and
+    // nobody has to ask — that is what makes it the room the whole community
+    // can be reached in.
+    //
+    // Done here rather than in the registration handler because this method is
+    // also what repairs an account that never got a membership, and a member
+    // repaired without their forum would be a member nobody could reach.
+    const forum = new ForumRepository(this.env.DB);
+    const general = await forum.defaultSpace();
+    if (general) {
+      await forum.setMembership({
+        spaceId: general.id,
+        userId: user.id,
+        state: 'member',
+      });
+    }
 
     const profile = await this.members.findByUserId(user.id);
     await this.recalculateCompletion(profile);

@@ -1,5 +1,4 @@
 import { ForumRepository, type ForumSpaceRecord } from '../repositories/forum.repository';
-import { MemberRepository } from '../repositories/member.repository';
 import { can } from './permissions';
 import type { Env } from '../types/env';
 import type { AuthenticatedUser } from '../types/auth';
@@ -14,6 +13,12 @@ export interface ForumAccess {
   isMember: boolean;
   /** Why they cannot post, in words they can act on. */
   blockedReason: string | null;
+  /** Their standing in this space: pending, member, rejected, removed… */
+  membershipState: string | null;
+  /** How this space is joined: automatic, request or closed. */
+  joinPolicy: string;
+  /** Whether the interface should offer a "join this forum" button. */
+  canRequestToJoin: boolean;
 }
 
 /**
@@ -47,11 +52,9 @@ export interface ForumAccess {
  */
 export class ForumService {
   private readonly forum: ForumRepository;
-  private readonly members: MemberRepository;
 
   constructor(env: Env) {
     this.forum = new ForumRepository(env.DB);
-    this.members = new MemberRepository(env.DB);
   }
 
   get repo(): ForumRepository {
@@ -63,6 +66,20 @@ export class ForumService {
    *
    * One method, called by every route, so the rules cannot drift between the
    * list view and the post handler.
+   *
+   * ---------------------------------------------------------------------------
+   * MEMBERSHIP IS PER SPACE
+   * ---------------------------------------------------------------------------
+   *
+   * This used to ask one question — is this person an active member of the
+   * community — and answer it for every members-only space at once. Belonging
+   * to the Youth Forum did not exist as a thing that could be true or false, so
+   * neither did being approved into it, removed from it or suspended from one
+   * space while staying in another.
+   *
+   * Since 0039 a `forum_members` row is the answer. The General Forum grants
+   * one automatically at registration; every other space is asked for and
+   * decided by its own admin.
    */
   async access(identifier: string, viewer: AuthenticatedUser | null): Promise<ForumAccess> {
     const space = await this.forum.findSpace(identifier);
@@ -70,29 +87,54 @@ export class ForumService {
       throw new NotFoundError('That space was not found.');
     }
 
-    const isAdmin = viewer !== null && can(viewer, 'users:update');
+    // A Super Admin or anybody who may manage users can read and moderate every
+    // space. That is deliberate and is the only way in that does not require a
+    // membership row.
+    const isGlobalAdmin = viewer !== null && can(viewer, 'users:update');
+
+    const membership =
+      viewer === null ? null : await this.forum.membershipFor(space.id, viewer.id);
+
+    const state = membership?.state ?? null;
+    const isMember = state === 'member';
+    const isSuspended = state === 'suspended';
+
     const isModerator =
-      isAdmin ||
-      (viewer !== null && (await this.forum.isModerator(viewer.id, space.id)));
+      isGlobalAdmin || (isMember && (membership?.role === 'admin' || membership?.role === 'moderator'));
 
-    // A member is somebody who completed their Yakoli membership — not merely
-    // somebody with an account. The forums are a community's conversation, and
-    // the community is the membership.
-    const profile = viewer === null ? null : await this.members.findByUserId(viewer.id);
-    const isMember = profile !== null && profile['membership_status'] === 'active';
-
+    // A public space is readable by anybody, member or not — the General Forum
+    // is public so that somebody deciding whether to join can see what the
+    // community talks about. Everything else needs a membership.
     const canRead = space.visibility === 'public' || isMember || isModerator;
 
     let blockedReason: string | null = null;
     let canPost = false;
 
     if (!canRead) {
-      blockedReason = space.visibility === 'members'
-        ? 'This space is for members of the Yakoli community.'
-        : 'You cannot read this space.';
+      blockedReason =
+        state === 'pending'
+          ? 'Your request to join this forum is waiting on its administrator.'
+          : state === 'rejected'
+            ? membership?.decision_note ?? 'Your request to join this forum was not accepted.'
+            : state === 'removed'
+              ? 'You are no longer a member of this forum.'
+              : 'This forum is for its members. You can ask to join it.';
+    } else if (isSuspended) {
+      const until = membership?.suspended_until ?? null;
+      blockedReason = until
+        ? `You are suspended from this forum until ${until.slice(0, 10)}.`
+        : 'You are suspended from this forum.';
     } else if (!isMember && !isModerator) {
-      blockedReason = 'Complete your membership to take part in the conversation.';
+      // Readable but not joined — a visitor, or a member who has not asked yet.
+      blockedReason =
+        viewer === null
+          ? 'Sign in to take part in the conversation.'
+          : state === 'pending'
+            ? 'Your request to join this forum is waiting on its administrator.'
+            : 'Join this forum to take part in the conversation.';
     } else {
+      // A sanction is the older, forum-wide instrument and still applies: a ban
+      // silences somebody everywhere, which a per-space suspension cannot.
       const sanction = viewer === null
         ? null
         : await this.forum.activeSanction(viewer.id, space.id);
@@ -114,7 +156,24 @@ export class ForumService {
       }
     }
 
-    return { space, canRead, canPost, isModerator, isMember, blockedReason };
+    return {
+      space,
+      canRead,
+      canPost,
+      isModerator,
+      isMember,
+      blockedReason,
+      // What the interface needs to draw the right button: Join, Asked,
+      // Approved, or nothing at all.
+      membershipState: state,
+      joinPolicy: String(space.join_policy ?? 'request'),
+      canRequestToJoin:
+        viewer !== null &&
+        !isMember &&
+        !isModerator &&
+        String(space.join_policy ?? 'request') === 'request' &&
+        (state === null || state === 'removed'),
+    };
   }
 
   /** Throws unless this person may read the space. */

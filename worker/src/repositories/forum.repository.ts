@@ -16,6 +16,25 @@ export interface ForumSpaceRecord {
   accent: string | null;
   topic_count: number;
   status: string;
+  /** How this space is joined: automatic, request or closed. See 0039. */
+  join_policy: string;
+  /** The one space every registered person belongs to. */
+  is_default: number;
+}
+
+/** One person's standing in one space. */
+export interface ForumMemberRecord {
+  id: string;
+  space_id: string;
+  user_id: string;
+  state: string;
+  role: string;
+  request_note: string | null;
+  decision_note: string | null;
+  suspended_until: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
 }
 
 export interface ForumTopicRecord {
@@ -582,6 +601,152 @@ export class ForumRepository {
   // -------------------------------------------------------------------------
   // Who may moderate, and who is silenced
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Membership — who belongs to which forum
+  // -------------------------------------------------------------------------
+
+  /** This person's standing in this space, whatever it is. */
+  async membershipFor(spaceId: string, userId: string): Promise<ForumMemberRecord | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM "forum_members" WHERE "space_id" = ? AND "user_id" = ? LIMIT 1`,
+      )
+      .bind(spaceId, userId)
+      .first<ForumMemberRecord>();
+    return row ?? null;
+  }
+
+  /** Every space this person belongs to, is waiting on, or was turned away from. */
+  async membershipsForUser(userId: string): Promise<Record<string, unknown>[]> {
+    const result = await this.db
+      .prepare(
+        `SELECT s."id", s."slug", s."name", s."tagline", s."icon", s."accent",
+                s."visibility", s."join_policy", s."is_default", s."topic_count",
+                fm."state", fm."role", fm."requested_at", fm."decision_note"
+         FROM "forum_spaces" s
+         LEFT JOIN "forum_members" fm ON fm."space_id" = s."id" AND fm."user_id" = ?
+         WHERE s."status" = 'published'
+         ORDER BY s."is_default" DESC, s."sort_order", s."name"`,
+      )
+      .bind(userId)
+      .all<Record<string, unknown>>();
+    return result.results ?? [];
+  }
+
+  /** The requests waiting on this space's admin. */
+  async pendingRequests(spaceId: string): Promise<Record<string, unknown>[]> {
+    const result = await this.db
+      .prepare(
+        `SELECT fm."id", fm."user_id", fm."request_note", fm."requested_at",
+                fm."state", u."display_name", p."handle", p."full_name",
+                m."storage_key" AS avatar_key
+         FROM "forum_members" fm
+         INNER JOIN "users" u ON u."id" = fm."user_id"
+         LEFT JOIN "member_profiles" p ON p."user_id" = fm."user_id"
+         LEFT JOIN "media_assets" m ON m."id" = p."avatar_media_id"
+         WHERE fm."space_id" = ? AND fm."state" = 'pending'
+         ORDER BY fm."requested_at"`,
+      )
+      .bind(spaceId)
+      .all<Record<string, unknown>>();
+    return result.results ?? [];
+  }
+
+  /** The people in a space, admins first. */
+  async membersOf(spaceId: string, states: string[] = ['member']): Promise<Record<string, unknown>[]> {
+    const placeholders = states.map(() => '?').join(', ');
+    const result = await this.db
+      .prepare(
+        `SELECT fm."id", fm."user_id", fm."state", fm."role", fm."suspended_until",
+                u."display_name", p."handle", p."full_name", m."storage_key" AS avatar_key
+         FROM "forum_members" fm
+         INNER JOIN "users" u ON u."id" = fm."user_id"
+         LEFT JOIN "member_profiles" p ON p."user_id" = fm."user_id"
+         LEFT JOIN "media_assets" m ON m."id" = p."avatar_media_id"
+         WHERE fm."space_id" = ? AND fm."state" IN (${placeholders})
+         ORDER BY CASE fm."role" WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
+                  COALESCE(p."full_name", u."display_name")`,
+      )
+      .bind(spaceId, ...states)
+      .all<Record<string, unknown>>();
+    return result.results ?? [];
+  }
+
+  /**
+   * Records a standing, creating the row or updating the one that exists.
+   *
+   * Upsert rather than insert, because `UNIQUE (space_id, user_id)` is what
+   * keeps one history per person per space — a second request has to become an
+   * update, or an admin loses the fact that they turned this person away once
+   * already.
+   */
+  async setMembership(values: {
+    spaceId: string;
+    userId: string;
+    state: string;
+    role?: string;
+    requestNote?: string | null;
+    decisionNote?: string | null;
+    suspendedUntil?: string | null;
+    decidedBy?: string | null;
+  }): Promise<void> {
+    const now = nowIso();
+    await this.db
+      .prepare(
+        `INSERT INTO "forum_members"
+           ("id", "space_id", "user_id", "state", "role", "request_note", "decision_note",
+            "suspended_until", "requested_at", "decided_at", "decided_by",
+            "created_at", "updated_at")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT ("space_id", "user_id") DO UPDATE SET
+           "state"           = excluded."state",
+           "role"            = COALESCE(excluded."role", "forum_members"."role"),
+           "request_note"    = COALESCE(excluded."request_note", "forum_members"."request_note"),
+           "decision_note"   = excluded."decision_note",
+           "suspended_until" = excluded."suspended_until",
+           "decided_at"      = excluded."decided_at",
+           "decided_by"      = excluded."decided_by",
+           "updated_at"      = excluded."updated_at"`,
+      )
+      .bind(
+        newId(),
+        values.spaceId,
+        values.userId,
+        values.state,
+        values.role ?? 'member',
+        values.requestNote ?? null,
+        values.decisionNote ?? null,
+        values.suspendedUntil ?? null,
+        now,
+        values.state === 'pending' ? null : now,
+        values.decidedBy ?? null,
+        now,
+        now,
+      )
+      .run();
+  }
+
+  /** The one space every registered person belongs to. */
+  async defaultSpace(): Promise<ForumSpaceRecord | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM "forum_spaces" WHERE "is_default" = 1 LIMIT 1`)
+      .first<ForumSpaceRecord>();
+    return row ?? null;
+  }
+
+  /** Whether this person runs this space. */
+  async isSpaceAdmin(spaceId: string, userId: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(
+        `SELECT "id" FROM "forum_members"
+         WHERE "space_id" = ? AND "user_id" = ? AND "state" = 'member'
+           AND "role" IN ('admin', 'moderator') LIMIT 1`,
+      )
+      .bind(spaceId, userId)
+      .first<{ id: string }>();
+    return row !== null;
+  }
 
   async isModerator(userId: string, spaceId: string | null): Promise<boolean> {
     const row = await this.db

@@ -1,4 +1,11 @@
 import type { RouteDefinition } from '../types/api';
+import {
+  myForums,
+  requestToJoin,
+  leaveForum,
+  listMembers,
+  decideMembership,
+} from '../controllers/forum-membership.controller';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
 import {
@@ -35,6 +42,46 @@ import {
  * probeable by an anonymous caller.
  */
 export const forumRoutes: RouteDefinition[] = [
+  // --- Membership ----------------------------------------------------------
+  //
+  // Before `/api/forums/:space`, so a space whose slug happened to be "mine"
+  // could not shadow a member's own list.
+  {
+    method: 'GET',
+    path: '/api/forums/mine',
+    handler: myForums,
+    middleware: [requireAuth],
+    description: 'Every forum, and where you stand in each',
+  },
+  {
+    method: 'POST',
+    path: '/api/forums/:space/join',
+    handler: requestToJoin,
+    middleware: [requireAuth],
+    description: 'Ask to join a forum',
+  },
+  {
+    method: 'POST',
+    path: '/api/forums/:space/leave',
+    handler: leaveForum,
+    middleware: [requireAuth],
+    description: 'Leave a forum. Not the General Forum',
+  },
+  {
+    method: 'GET',
+    path: '/api/forums/:space/members',
+    handler: listMembers,
+    middleware: [requireAuth],
+    description: 'The roster and the queue, for a forum’s administrators',
+  },
+  {
+    method: 'POST',
+    path: '/api/forums/:space/members/:userId/decide',
+    handler: decideMembership,
+    middleware: [requireAuth],
+    description: 'Approve, reject, remove, suspend, restore or change a role',
+  },
+
   // --- Moderation: static, and first ---------------------------------------
   {
     method: 'GET',

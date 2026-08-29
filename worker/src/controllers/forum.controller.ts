@@ -64,6 +64,11 @@ export async function listSpaces(context: RequestContext): Promise<Response> {
         can_read: access.canRead,
         can_post: access.canPost,
         blocked_reason: access.blockedReason,
+        // What the interface needs to draw the right control: Join, Asked,
+        // Approved, or nothing at all.
+        membership_state: access.membershipState,
+        join_policy: access.joinPolicy,
+        can_request_to_join: access.canRequestToJoin,
       };
     }),
   );
@@ -117,6 +122,11 @@ export async function showSpace(context: RequestContext): Promise<Response> {
         can_post: access.canPost,
         is_moderator: access.isModerator,
         blocked_reason: access.blockedReason,
+        // What the interface needs to draw the right control: Join, Asked,
+        // Approved, or nothing at all.
+        membership_state: access.membershipState,
+        join_policy: access.joinPolicy,
+        can_request_to_join: access.canRequestToJoin,
       },
     },
     { headers: NO_STORE_HEADERS },
@@ -172,6 +182,11 @@ export async function showTopic(context: RequestContext): Promise<Response> {
         can_post: access.canPost,
         is_moderator: access.isModerator,
         blocked_reason: access.blockedReason,
+        // What the interface needs to draw the right control: Join, Asked,
+        // Approved, or nothing at all.
+        membership_state: access.membershipState,
+        join_policy: access.joinPolicy,
+        can_request_to_join: access.canRequestToJoin,
         is_mine: context.user !== null && topic.author_id === context.user.id,
       },
     },
