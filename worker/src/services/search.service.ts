@@ -52,6 +52,7 @@ export async function searchArchive(
         // Search never reaches beyond published content: an unpublished draft
         // must not be discoverable by guessing at its words.
         status: CONTENT_STATUS.PUBLISHED,
+        filters: resource.fixedFilters,
         search: trimmed,
         searchColumns: resource.searchableColumns,
         sortColumn: resource.defaultSort,

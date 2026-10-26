@@ -1,3 +1,4 @@
+import { encodeSettingValue } from '../services/setting-value';
 import type { RequestContext } from '../types/api';
 import { SettingsRepository, settingsToMap } from '../repositories/settings.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
@@ -47,6 +48,7 @@ export async function updateSettings(context: RequestContext): Promise<Response>
 
   const updated: string[] = [];
   const unknown: string[] = [];
+  const values: Record<string, string | null> = {};
 
   for (const [key, value] of Object.entries(body)) {
     const existing = await repository.get(key);
@@ -54,14 +56,15 @@ export async function updateSettings(context: RequestContext): Promise<Response>
       unknown.push(key);
       continue;
     }
-    const encoded = value === null ? null : typeof value === 'string' ? value : JSON.stringify(value);
-    await repository.setValue(key, encoded);
+    values[key] = encodeSettingValue(key, existing.value_type, value);
     updated.push(key);
   }
 
   if (updated.length === 0 && unknown.length > 0) {
     throw new NotFoundError('None of the supplied settings exist.');
   }
+
+  await repository.setValues(values);
 
   await audit.record({
     actorId: context.user.id,

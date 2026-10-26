@@ -33,6 +33,14 @@ export class SettingsRepository {
     return row ?? null;
   }
 
+  async setValues(values: Record<string, string | null>): Promise<void> {
+    const timestamp = nowIso();
+    const statements = Object.entries(values).map(([key, value]) => this.db
+      .prepare('UPDATE "site_settings" SET "value" = ?, "updated_at" = ? WHERE "key" = ?')
+      .bind(value, timestamp, key));
+    if (statements.length > 0) await this.db.batch(statements);
+  }
+
   /**
    * Updates an existing setting. Settings are created by migrations so that the
    * set of keys stays under version control; an administrator changes values,

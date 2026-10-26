@@ -6,6 +6,9 @@ import { CONTENT_STATUS } from '../types/models';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
+import { parsePagination } from '../utils/pagination';
+import { CONTENT_RESOURCES } from '../services/content-registry';
+import { ContentRepository } from '../repositories/content.repository';
 import { publicMediaUrl } from '../utils/files';
 
 /**
@@ -404,10 +407,11 @@ export async function contributorsForResource(context: RequestContext): Promise<
 /** `GET /api/editorial/sources` */
 export async function listSources(context: RequestContext): Promise<Response> {
   const repository = new EditorialRepository(context.env.DB);
+  const { perPage, offset } = parsePagination(context.query);
   const { items, total } = await repository.listSources({
     search: context.query.get('q'),
-    limit: 100,
-    offset: 0,
+    limit: perPage,
+    offset,
   });
   return json({ sources: items, total }, { headers: NO_STORE_HEADERS });
 }
@@ -460,6 +464,15 @@ export async function attachSource(context: RequestContext): Promise<Response> {
     .validated();
 
   const repository = new EditorialRepository(context.env.DB);
+  const resource = CONTENT_RESOURCES[validated['resource_type'] as string];
+  if (!resource) throw new BadRequestError('Choose an archive content type.');
+  const record = await new ContentRepository(context.env.DB, resource)
+    .findById(validated['resource_id'] as string, null);
+  if (!record) throw new NotFoundError('That archive record was not found.');
+  const source = await context.env.DB.prepare('SELECT "id" FROM "sources" WHERE "id" = ?')
+    .bind(validated['source_id']).first();
+  if (!source) throw new NotFoundError('That source was not found.');
+
   const id = await repository.attachSource({
     resourceType: validated['resource_type'] as string,
     resourceId: validated['resource_id'] as string,
