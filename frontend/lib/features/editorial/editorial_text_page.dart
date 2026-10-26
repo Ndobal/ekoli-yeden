@@ -19,6 +19,7 @@ import '../../models/content_record.dart';
 import '../../services/auth/auth_controller.dart';
 import '../workspace/content_editor.dart';
 import '../workspace/source_tools.dart';
+import '../workspace/version_history_dialog.dart';
 import 'editorial_shell.dart';
 
 /// EDIT THE WEBSITE'S TEXT.
@@ -445,7 +446,7 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
           FilledButton.icon(
             onPressed: _openEditor,
             icon: const Icon(Icons.add, size: 18),
-            label: Text('New ${widget.title.toLowerCase()}'),
+            label: Text(widget.resource == 'community' ? 'New project' : 'New ${widget.title.toLowerCase()}'),
           ),
       ],
       child: Column(
@@ -565,6 +566,8 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
                                   icon: const Icon(Icons.menu_book_outlined, size: 16),
                                   label: const Text('Sources'),
                                 ),
+                              if (auth.canAny(<String>['versions:read', 'content.read', 'content.edit', 'content.manage']))
+                                OutlinedButton.icon(onPressed: () => showDialog<void>(context: context, builder: (_) => VersionHistoryDialog(resource: widget.resource, recordId: record.id)), icon: const Icon(Icons.history, size: 16), label: const Text('History')),
                               if (record.status == ContentStatus.draft &&
                                   (auth.can('content.submit') || auth.can('*')))
                                 _WorkflowButton(

@@ -192,6 +192,8 @@ class AppRoutes {
   // account never sees an administrative control.
   static const String editorial = '/editorial';
   static const String editorialDashboard = '/editorial/dashboard';
+  static const String editorialHomepageText = '/editorial/homepage/text';
+  static const String editorialMap = '/editorial/map';
   static const String editorialHomepage = '/editorial/homepage';
   static const String editorialPages = '/editorial/pages';
   static const String editorialNavigation = '/editorial/navigation';
@@ -547,6 +549,7 @@ const List<NavItem> editorialNavigation = <NavItem>[
     path: AppRoutes.editorialQuizzes,
     description: 'The children’s learning area',
   ),
+  NavItem(label: 'Map locations', path: AppRoutes.editorialMap, description: 'Record verified coordinates'),
   NavItem(label: 'Sources', path: AppRoutes.editorialSources, description: 'The citation library'),
 ];
 

@@ -38,11 +38,12 @@ class _SourcesManagerState extends State<SourcesManager> {
                   context: context,
                   builder: (_) => const CreateSourceDialog(),
                 );
-                if (saved == true && mounted)
+                if (saved == true && mounted) {
                   setState(() {
                     _reload++;
                     _page = 1;
                   });
+                }
               },
               icon: const Icon(Icons.add),
               label: const Text('Add source'),
@@ -191,15 +192,17 @@ class _CreateSourceDialogState extends State<CreateSourceDialog> {
                           : 1,
                       decoration: InputDecoration(labelText: entry.value),
                       validator: (v) {
-                        if (entry.key == 'title' && (v?.trim().isEmpty ?? true))
+                        if (entry.key == 'title' && (v?.trim().isEmpty ?? true)) {
                           return 'Enter a title.';
+                        }
                         if (entry.key == 'url' &&
                             (v?.trim().isNotEmpty ?? false)) {
                           final uri = Uri.tryParse(v!.trim());
                           if (uri == null ||
                               !<String>['http', 'https'].contains(uri.scheme) ||
-                              uri.host.isEmpty)
+                              uri.host.isEmpty) {
                             return 'Enter an http or https address.';
+                          }
                         }
                         return null;
                       },
@@ -307,11 +310,12 @@ class _RecordSourcesDialogState extends State<RecordSourcesDialog> {
         'supports': _supports.text.trim(),
         'page_reference': _pageReference.text.trim(),
       });
-      if (mounted)
+      if (mounted) {
         setState(() {
           _message = 'Source attached.';
           _reload++;
         });
+      }
     } on AppException catch (e) {
       if (mounted) setState(() => _message = e.message);
     } finally {

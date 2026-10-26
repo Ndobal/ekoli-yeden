@@ -52,8 +52,9 @@ class QuizQuestionsEditorState extends State<QuizQuestionsEditor> {
   bool validate() {
     if (_loading || _error != null) return false;
     String? error;
-    if (_questions.isEmpty)
+    if (_questions.isEmpty) {
       error = 'Add at least one question before saving the quiz.';
+    }
     for (var i = 0; i < _questions.length; i++) {
       final q = _questions[i];
       if (q.prompt.text.trim().isEmpty ||

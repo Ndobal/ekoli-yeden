@@ -1,9 +1,10 @@
+import { setPlaceCoordinates, editorialMapPlaces, mapPlaces } from '../src/controllers/discover.controller';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { updateSettings } from '../src/controllers/settings.controller';
-import { createSource, attachSource, listSources } from '../src/controllers/cms.controller';
+import { createSource, attachSource, listSources, updateHeroSlide, updateNavigationItem, layoutDraftAction, editorialHero, heroCarousel, editorialNavigation, bundle, listVersions, showVersion } from '../src/controllers/cms.controller';
 import { adminCreate, adminUpdate, adminChangeStatus } from '../src/controllers/content.controller';
 import { replaceQuestions, editorialQuestions, showQuiz } from '../src/controllers/learning.controller';
 import { CONTENT_RESOURCES } from '../src/services/content-registry';
@@ -159,4 +160,144 @@ it('refuses inline publication by an editor without publishing authority', async
   const request = context({ title: 'Draft', status: 'published' });
   request.user = { ...actor, permissions: new Set(['history:create', 'content.edit']) } as any;
   await expect(adminCreate(resource('history'))(request)).rejects.toMatchObject({ status: 403 });
+});
+
+const heroId = '1';
+async function heroDraft(values: Record<string, unknown> = {}, revision = 0) {
+  return data(await updateHeroSlide(context({ title: 'Proposed heading', status: 'published', ...values, expected_revision: revision }, { slide: heroId })));
+}
+async function layoutAction(kind: string, id: string, action: string, revision: number) {
+  return layoutDraftAction(context({ expected_revision: revision }, { kind, id, action }));
+}
+
+describe('carousel drafts', () => {
+  it('keeps changes out of public responses until reviewed and published', async () => {
+    const old = sqlite.prepare('SELECT title FROM hero_slides WHERE slide_number = 1').get()?.title;
+    await heroDraft();
+    const publicData = await data(await heroCarousel(context()));
+    expect(publicData.slides.find((s: any) => s.slideNumber === 1).title).toBe(old);
+    const editorial = await data(await editorialHero(context()));
+    expect(editorial.slides[0].draft.values.title).toBe('Proposed heading');
+    expect(editorial.slides[0].draft.state).toBe('draft');
+    await layoutAction('hero', heroId, 'submit', 1);
+    await layoutAction('hero', heroId, 'approve', 2);
+    await layoutAction('hero', heroId, 'publish', 3);
+    expect(sqlite.prepare('SELECT title FROM hero_slides WHERE slide_number = 1').get()?.title).toBe('Proposed heading');
+    const history = await data(await listVersions(context({}, { resourceType: 'hero_slide', resourceId: heroId })));
+    expect(history.versions).toHaveLength(1);
+    const snapshot = await data(await showVersion(context({}, { resourceType: 'hero_slide', resourceId: heroId, version: '1' })));
+    expect(snapshot.snapshot.title).toBe(old);
+    expect(snapshot.changedFields.title.to).toBe('Proposed heading');
+  });
+  it('rejects stale saves and requires a revision number', async () => {
+    await heroDraft();
+    await expect(heroDraft({ title: 'Lost change' }, 0)).rejects.toMatchObject({ status: 409 });
+    await expect(updateHeroSlide(context({ title: 'No revision' }, { slide: heroId }))).rejects.toMatchObject({ status: 422 });
+  });
+  it('requires approval again after an approved draft is edited', async () => {
+    await heroDraft();
+    await layoutAction('hero', heroId, 'submit', 1);
+    await layoutAction('hero', heroId, 'approve', 2);
+    await heroDraft({ title: 'Changed after approval' }, 3);
+    await expect(layoutAction('hero', heroId, 'publish', 4)).rejects.toMatchObject({ status: 409 });
+  });
+  it('does not grant publication or review authority to a homepage editor', async () => {
+    await heroDraft();
+    const request = context({ expected_revision: 1 }, { kind: 'hero', id: heroId, action: 'publish' });
+    request.user = { ...actor, permissions: new Set(['homepage.edit']) } as any;
+    await expect(layoutDraftAction(request)).rejects.toMatchObject({ status: 403 });
+    const review = context({ expected_revision: 1 }, { kind: 'hero', id: heroId, action: 'approve' });
+    review.user = request.user;
+    await expect(layoutDraftAction(review)).rejects.toMatchObject({ status: 403 });
+  });
+  it('discards only the draft and keeps the live carousel', async () => {
+    const old = sqlite.prepare('SELECT title FROM hero_slides WHERE slide_number = 1').get()?.title;
+    await heroDraft();
+    await layoutAction('hero', heroId, 'discard', 1);
+    expect(sqlite.prepare('SELECT title FROM hero_slides WHERE slide_number = 1').get()?.title).toBe(old);
+    await expect(heroDraft({}, 0)).rejects.toMatchObject({ status: 409 });
+    await heroDraft({}, 2);
+  });
+  it('rejects incomplete buttons and nonexistent image attachments', async () => {
+    await expect(heroDraft({ primary_button_label: 'Open', primary_button_path: '' })).rejects.toMatchObject({ status: 422 });
+    await expect(heroDraft({ image_media_id: 'missing', image_alt_text: 'Description' })).rejects.toMatchObject({ status: 422 });
+  });
+  it('hides a slide only after its visibility change is published', async () => {
+    await heroDraft({ status: 'archived' });
+    expect((await data(await heroCarousel(context()))).slides.some((s: any) => s.slideNumber === 1)).toBe(true);
+    await layoutAction('hero', heroId, 'submit', 1);
+    await layoutAction('hero', heroId, 'approve', 2);
+    await layoutAction('hero', heroId, 'publish', 3);
+    expect((await data(await heroCarousel(context()))).slides.some((s: any) => s.slideNumber === 1)).toBe(false);
+  });
+});
+
+describe('navigation drafts', () => {
+  it('stages labels, destinations, emphasis, order and visibility', async () => {
+    const row = sqlite.prepare("SELECT * FROM navigation_items WHERE menu = 'primary' LIMIT 1").get()!;
+    await updateNavigationItem(context({ label: 'Changed menu', path: '/history', sort_order: 7, is_cta: true, status: 'published', expected_revision: 0 }, { id: String(row.id) }));
+    expect(sqlite.prepare('SELECT label FROM navigation_items WHERE id = ?').get(row.id!)?.label).toBe(row.label);
+    const staged = await data(await editorialNavigation(context()));
+    expect(staged.items.find((n: any) => n.id === row.id).draft.values.path).toBe('/history');
+    await layoutAction('navigation', String(row.id), 'submit', 1);
+    await layoutAction('navigation', String(row.id), 'approve', 2);
+    await layoutAction('navigation', String(row.id), 'publish', 3);
+    const publicNav = await data(await bundle(context()));
+    const updated = publicNav.navigation.primary.find((n: any) => n.id === row.id);
+    expect(updated).toMatchObject({ label: 'Changed menu', path: '/history', isCta: true });
+    expect(sqlite.prepare('SELECT sort_order FROM navigation_items WHERE id = ?').get(row.id!)?.sort_order).toBe(7);
+  });
+  it.each(['//outside.test', 'javascript:alert(1)', '/\\outside.test', '/invalid path'])('rejects unsafe destination %s', async path => {
+    const row = sqlite.prepare('SELECT id FROM navigation_items LIMIT 1').get()!;
+    await expect(updateNavigationItem(context({ path, expected_revision: 0 }, { id: String(row.id) }))).rejects.toMatchObject({ status: 422 });
+  });
+  it('restricts menu editing to the right permission', async () => {
+    const row = sqlite.prepare('SELECT id FROM navigation_items LIMIT 1').get()!;
+    const request = context({ path: '/history', expected_revision: 0 }, { id: String(row.id) });
+    request.user = { ...actor, permissions: new Set(['homepage.edit']) } as any;
+    await expect(updateNavigationItem(request)).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('map editor', () => {
+  it('saves and clears coordinates, preserving snapshots', async () => {
+    const place = sqlite.prepare('SELECT id FROM places LIMIT 1').get()!;
+    await setPlaceCoordinates(context({ latitude: 5.5, longitude: 8.3 }, { id: String(place.id) }));
+    expect(sqlite.prepare('SELECT latitude FROM places WHERE id = ?').get(place.id!)?.latitude).toBe(5.5);
+    await setPlaceCoordinates(context({ latitude: null, longitude: null, previous_latitude: 5.5, previous_longitude: 8.3 }, { id: String(place.id) }));
+    expect(sqlite.prepare('SELECT latitude FROM places WHERE id = ?').get(place.id!)?.latitude).toBeNull();
+    const versions = await data(await listVersions(context({}, { resourceType: 'places', resourceId: String(place.id) })));
+    expect(versions.versions).toHaveLength(2);
+    const previous = await data(await showVersion(context({}, { resourceType: 'places', resourceId: String(place.id), version: '2' })));
+    expect(previous.snapshot.latitude).toBe(5.5);
+  });
+  it('rejects invalid, incomplete and stale coordinates', async () => {
+    const place = sqlite.prepare('SELECT id FROM places LIMIT 1').get()!;
+    await expect(setPlaceCoordinates(context({ latitude: 91, longitude: 1 }, { id: String(place.id) }))).rejects.toMatchObject({ status: 422 });
+    await expect(setPlaceCoordinates(context({ latitude: 5 }, { id: String(place.id) }))).rejects.toMatchObject({ status: 422 });
+    await setPlaceCoordinates(context({ latitude: 5, longitude: 8 }, { id: String(place.id) }));
+    await expect(setPlaceCoordinates(context({ latitude: 6, longitude: 8, previous_latitude: null, previous_longitude: null }, { id: String(place.id) }))).rejects.toMatchObject({ status: 409 });
+  });
+  it('includes unpublished places only in the protected editorial map', async () => {
+    const place = sqlite.prepare('SELECT id FROM places LIMIT 1').get()!;
+    sqlite.prepare("UPDATE places SET status = 'draft' WHERE id = ?").run(place.id!);
+    const editorial = await data(await editorialMapPlaces(context()));
+    const publicMap = await data(await mapPlaces(context()));
+    expect(editorial.items.some((p: any) => p.id === place.id)).toBe(true);
+    expect(publicMap.items.some((p: any) => p.id === place.id)).toBe(false);
+  });
+});
+
+describe('project funding', () => {
+  it('saves decimal amounts, currency and completion date, and permits clearing amounts', async () => {
+    const project = await create('community', { title: 'Project', funding_target: 500000.5, funds_raised: 125000.25, currency: 'NGN', progress_percent: 25, completion_date: '2027-01-01' });
+    expect(project.funding_target).toBe(500000.5);
+    expect(project.funds_raised).toBe(125000.25);
+    const updated = await data(await adminUpdate(resource('community'))(context({ funds_raised: null, currency: 'USD' }, { id: project.id })));
+    expect(updated.funds_raised).toBeNull();
+    expect(updated.currency).toBe('USD');
+  });
+  it.each([{ funding_target: -1 }, { funds_raised: '100' }, { currency: 'naira' }, { progress_percent: 101 }, { completion_date: 'not a date' }])('rejects invalid funding values %j', async invalid => {
+    await expect(create('community', { title: 'Project', ...invalid })).rejects.toMatchObject({ status: 422 });
+  });
 });

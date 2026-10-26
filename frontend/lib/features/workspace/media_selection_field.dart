@@ -13,11 +13,13 @@ class MediaSelectionField extends StatefulWidget {
     required this.label,
     required this.kind,
     required this.controller,
+    this.onSelected,
     super.key,
   });
   final String label;
   final String kind;
   final TextEditingController controller;
+  final ValueChanged<MediaAsset?>? onSelected;
 
   @override
   State<MediaSelectionField> createState() => _MediaSelectionFieldState();
@@ -32,6 +34,7 @@ class _MediaSelectionFieldState extends State<MediaSelectionField> {
       builder: (_) => _MediaPicker(kind: widget.kind),
     );
     if (!mounted || media == null) return;
+    widget.onSelected?.call(media);
     setState(() {
       widget.controller.text = media.id;
       _title = media.displayTitle;
@@ -68,6 +71,7 @@ class _MediaSelectionFieldState extends State<MediaSelectionField> {
               if (widget.controller.text.isNotEmpty)
                 TextButton(
                   onPressed: () => setState(() {
+                    widget.onSelected?.call(null);
                     widget.controller.clear();
                     _title = null;
                   }),

@@ -1,5 +1,6 @@
 import type { RouteDefinition } from '../types/api';
 import {
+  layoutDraftAction,
   attachSource,
   createSource,
   editorialHero,
@@ -32,6 +33,13 @@ import { requireAuth, requirePermission } from '../middleware/auth';
  * Publisher is still required to make that change visible.
  */
 export const editorialRoutes: RouteDefinition[] = [
+  {
+    method: 'POST',
+    path: '/api/editorial/layout/:kind/:id/:action',
+    handler: layoutDraftAction,
+    middleware: [requireAuth],
+    description: 'Submit, review, publish or discard a staged carousel/menu change; action-specific permissions are checked in the handler',
+  },
   {
     method: 'GET',
     path: '/api/editorial/dashboard',

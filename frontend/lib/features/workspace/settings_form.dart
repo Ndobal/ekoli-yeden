@@ -59,8 +59,9 @@ class _SettingsFormState extends State<SettingsForm> {
     }
     for (final entry in _text.entries) {
       final value = entry.value.text.trim();
-      if (value != _original[entry.key])
+      if (value != _original[entry.key]) {
         changes[entry.key] = value.isEmpty ? null : value;
+      }
     }
     if (changes.isEmpty) {
       setState(() {
@@ -89,11 +90,12 @@ class _SettingsFormState extends State<SettingsForm> {
         _failed = false;
       });
     } on AppException catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _message = error.message;
           _failed = true;
         });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -175,8 +177,9 @@ class _SettingsFormState extends State<SettingsForm> {
           final text = value?.trim() ?? '';
           if (text.isEmpty) return null;
           if (row['type'] == 'number' &&
-              (num.tryParse(text) == null || !num.parse(text).isFinite))
+              (num.tryParse(text) == null || !num.parse(text).isFinite)) {
             return 'Enter a valid number.';
+          }
           if (row['type'] == 'json') {
             try {
               jsonDecode(text);

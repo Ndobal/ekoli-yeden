@@ -206,13 +206,15 @@ class CommunityProjectDetailPage extends StatelessWidget {
         DetailField(
           label: 'Funding target',
           key: 'funding_target',
-          formatter: (dynamic value) => Formatters.currency(value as num?, 'NGN'),
+          recordFormatter: (dynamic value, ContentRecord record) => Formatters.currency(value as num?, record.text('currency') ?? 'NGN', decimalDigits: 2),
         ),
         DetailField(
           label: 'Funds raised',
           key: 'funds_raised',
-          formatter: (dynamic value) => Formatters.currency(value as num?, 'NGN'),
+          recordFormatter: (dynamic value, ContentRecord record) => Formatters.currency(value as num?, record.text('currency') ?? 'NGN', decimalDigits: 2),
         ),
+        const DetailField(label: 'Currency', key: 'currency'),
+        DetailField(label: 'Completed', key: 'completion_date', formatter: (dynamic value) => Formatters.date(value.toString())),
         DetailField(
           label: 'Started',
           key: 'start_date',

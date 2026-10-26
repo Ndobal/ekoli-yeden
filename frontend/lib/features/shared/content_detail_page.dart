@@ -530,7 +530,7 @@ class _CorrectionInvitation extends StatelessWidget {
 
 /// One labelled field on a detail page.
 class DetailField {
-  const DetailField({required this.label, required this.key, this.formatter});
+  const DetailField({required this.label, required this.key, this.formatter, this.recordFormatter});
 
   final String label;
 
@@ -539,6 +539,7 @@ class DetailField {
 
   /// How to render the raw value. Defaults to showing it as text.
   final String Function(dynamic value)? formatter;
+  final String Function(dynamic value, ContentRecord record)? recordFormatter;
 }
 
 class _DetailFieldList extends StatelessWidget {
@@ -559,7 +560,7 @@ class _DetailFieldList extends StatelessWidget {
         // hidden — it tells a reader what the archive still needs.
         final String display = value == null || value.toString().trim().isEmpty
             ? Placeholders.notYetSupplied
-            : (field.formatter?.call(value) ?? value.toString());
+            : (field.recordFormatter?.call(value, record) ?? field.formatter?.call(value) ?? value.toString());
         final bool isMissing = display == Placeholders.notYetSupplied;
 
         return Padding(

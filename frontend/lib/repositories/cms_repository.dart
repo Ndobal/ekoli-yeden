@@ -81,6 +81,13 @@ class CmsRepository {
     await _api.patch('/api/editorial/navigation/$id', body: values);
   }
 
+  Future<void> layoutAction(String kind, String id, String action, int revision) async {
+    await _api.post('/api/editorial/layout/$kind/$id/$action', body: <String, dynamic>{'expected_revision': revision});
+  }
+
+  Future<Map<String, dynamic>> version(String resource, String id, int number) =>
+      _api.get('/api/editorial/versions/$resource/$id/$number');
+
   Future<Map<String, dynamic>> sources({String? search, int page = 1}) =>
       _api.get('/api/editorial/sources', query: <String, dynamic>{'q': ?search, 'page': page, 'perPage': 30});
 

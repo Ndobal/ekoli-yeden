@@ -259,6 +259,18 @@ function validateCommonFields(resource: ContentResource, body: Record<string, un
   if ('youtube_video_id' in body) {
     validator.youtubeVideoId('youtube_video_id', { required: resource.key === 'videos' });
   }
+  if (resource.key === 'community') {
+    for (const field of ['funding_target', 'funds_raised']) {
+      const value = body[field];
+      if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1e15)) {
+        throw new ValidationError({ [field]: ['Enter an amount from zero to 1,000,000,000,000,000.'] });
+      }
+    }
+    if ('currency' in body) validator.string('currency', { required: true, pattern: /^[A-Z]{3}$/, label: 'Currency code' });
+    if ('progress_percent' in body) validator.integer('progress_percent', { min: 0, max: 100, required: true });
+    if (body['start_date']) validator.date('start_date');
+    if (body['completion_date']) validator.date('completion_date');
+  }
   if (resource.key === 'quizzes') {
     if ('subject' in body) validator.oneOf('subject', ['general', 'language', 'greetings', 'numbers', 'proverbs', 'history', 'culture', 'leboku', 'people', 'places', 'values']);
     if ('level' in body) validator.oneOf('level', ['starter', 'growing', 'confident']);

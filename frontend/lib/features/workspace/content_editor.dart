@@ -53,6 +53,7 @@ class ContentField {
     this.options,
     this.mediaKind,
     this.integer = false,
+    this.amount = false,
   });
 
   final String key;
@@ -66,6 +67,7 @@ class ContentField {
   final List<String>? options;
   final String? mediaKind;
   final bool integer;
+  final bool amount;
 }
 
 /// The fields each content type offers.
@@ -563,6 +565,23 @@ List<ContentField> fieldsFor(String resource) {
         ),
         ContentField(key: 'location', label: 'Location'),
         ContentField(key: 'committee', label: 'Committee'),
+        ContentField(
+          key: 'funding_target',
+          label: 'Funding target',
+          amount: true,
+          helper: 'Enter the amount in the selected currency.',
+        ),
+        ContentField(key: 'funds_raised', label: 'Funds raised', amount: true),
+        ContentField(
+          key: 'currency',
+          label: 'Currency code',
+          required: true,
+          helper: 'Three capital letters, for example NGN, USD or GBP.',
+        ),
+        ContentField(
+          key: 'completion_date',
+          label: 'Completion date (YYYY-MM-DD)',
+        ),
         ContentField(key: 'progress_percent', label: 'Progress (0–100)'),
         ContentField(
           key: 'project_status',
@@ -608,7 +627,8 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
 
     for (final ContentField field in _fields) {
       final dynamic existing = widget.record?.raw[field.key];
-      final String value = existing?.toString() ?? '';
+      final String value =
+          existing?.toString() ?? (field.key == 'currency' ? 'NGN' : '');
       if (field.options != null) {
         _dropdowns[field.key] = field.options!.contains(value)
             ? value
@@ -637,8 +657,13 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       final String text = _controllers[field.key]?.text.trim() ?? '';
       // `year`, `founded_year` and `progress_percent` are integers server-side.
       if (text.isEmpty) {
-        if (!_isNew && _savedRecord?.raw[field.key] != null)
+        if (!_isNew && _savedRecord?.raw[field.key] != null) {
           values[field.key] = null;
+        }
+        continue;
+      }
+      if (field.amount) {
+        values[field.key] = double.parse(text);
         continue;
       }
       if (field.integer ||
@@ -660,8 +685,9 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     if (widget.resource == 'quizzes' &&
-        !(_questionsKey.currentState?.validate() ?? false))
+        !(_questionsKey.currentState?.validate() ?? false)) {
       return;
+    }
     if (widget.resource == 'recordings') {
       if ((_controllers['youtube_video_id']?.text.trim().isEmpty ?? true) &&
           (_controllers['audio_media_id']?.text.trim().isEmpty ?? true)) {
@@ -688,6 +714,7 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       final ContentRepository repository = context.contentRepository(
         widget.resource,
       );
+      final quizApi = context.read<ApiClient>();
       final Map<String, dynamic> values = _collect();
 
       final ContentRecord saved = _isNew
@@ -698,7 +725,7 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       _savedRecord = saved;
       _hasSaved = true;
       if (widget.resource == 'quizzes') {
-        await context.read<ApiClient>().put(
+        await quizApi.put(
           '/api/editorial/quizzes/${saved.id}/questions',
           body: <String, dynamic>{
             'questions': _questionsKey.currentState!.collect(),
@@ -740,8 +767,8 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       child: AlertDialog(
         title: Text(
           _isNew
-              ? 'New ${widget.title.toLowerCase()}'
-              : 'Edit ${widget.title.toLowerCase()}',
+              ? 'New ${widget.resource == 'community' ? 'community project' : widget.title.toLowerCase()}'
+              : 'Edit ${widget.resource == 'community' ? 'community project' : widget.title.toLowerCase()}',
         ),
         content: SizedBox(
           width: 640,
@@ -885,7 +912,11 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: TextFormField(
         controller: _controllers[field.key],
-        keyboardType: field.integer ? TextInputType.number : null,
+        keyboardType: field.amount
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : field.integer
+            ? TextInputType.number
+            : null,
         maxLines: field.multiline ? field.lines : 1,
         minLines: field.multiline ? 3 : 1,
         decoration: InputDecoration(
@@ -896,12 +927,23 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
         ),
         validator: (String? value) {
           final text = value?.trim() ?? '';
-          if (field.required && text.isEmpty)
+          if (field.key == 'currency' && !RegExp(r'^[A-Z]{3}$').hasMatch(text)) {
+            return 'Enter a three-letter capital currency code.';
+          }
+          if (field.amount && text.isNotEmpty) {
+            final value = double.tryParse(text);
+            if (value == null || !value.isFinite || value < 0 || value > 1e15) {
+              return 'Enter a valid, non-negative amount.';
+            }
+          }
+          if (field.required && text.isEmpty) {
             return '${field.label} is required.';
+          }
           if (field.integer &&
               text.isNotEmpty &&
-              (int.tryParse(text) == null || int.parse(text) < 0))
+              (int.tryParse(text) == null || int.parse(text) < 0)) {
             return 'Enter a non-negative whole number.';
+          }
           return null;
         },
       ),

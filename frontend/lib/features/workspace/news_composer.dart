@@ -1,3 +1,4 @@
+import 'version_history_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -207,6 +208,7 @@ class _ComposerState extends State<_Composer> {
       workspaceName: isAdmin ? 'Administration' : 'Editorial',
       accent: isAdmin ? AppColors.gold : AppColors.skyBlue,
       navigation: isAdmin ? adminNavigation : editorialNavigation,
+      actions: <Widget>[if (_id != null) TextButton.icon(onPressed: () => showDialog<void>(context: context, builder: (_) => VersionHistoryDialog(resource: 'news', recordId: _id!)), icon: const Icon(Icons.history), label: const Text('History'))],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
