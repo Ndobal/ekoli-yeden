@@ -10,6 +10,9 @@ import '../../core/theme/app_spacing.dart';
 import '../../models/content_record.dart';
 import '../../repositories/content_repository.dart';
 import '../../services/auth/auth_controller.dart';
+import '../../services/api/api_client.dart';
+import 'media_selection_field.dart';
+import 'quiz_questions_editor.dart';
 
 /// Creating and editing an archive record.
 ///
@@ -48,6 +51,9 @@ class ContentField {
     this.lines = 1,
     this.required = false,
     this.options,
+    this.mediaKind,
+    this.integer = false,
+    this.amount = false,
   });
 
   final String key;
@@ -59,6 +65,9 @@ class ContentField {
 
   /// When present the field renders as a dropdown.
   final List<String>? options;
+  final String? mediaKind;
+  final bool integer;
+  final bool amount;
 }
 
 /// The fields each content type offers.
@@ -84,7 +93,12 @@ List<ContentField> fieldsFor(String resource) {
     case 'history':
       return const <ContentField>[
         title,
-        ContentField(key: 'summary', label: 'Summary', multiline: true, lines: 3),
+        ContentField(
+          key: 'summary',
+          label: 'Summary',
+          multiline: true,
+          lines: 3,
+        ),
         body,
         ContentField(
           key: 'period_label',
@@ -109,11 +123,17 @@ List<ContentField> fieldsFor(String resource) {
         ),
       ];
 
+    case 'stories':
     case 'culture':
       return const <ContentField>[
         title,
         ContentField(key: 'subtitle', label: 'Subtitle'),
-        ContentField(key: 'excerpt', label: 'Summary', multiline: true, lines: 3),
+        ContentField(
+          key: 'excerpt',
+          label: 'Summary',
+          multiline: true,
+          lines: 3,
+        ),
         body,
         ContentField(key: 'category', label: 'Category'),
         ContentField(
@@ -129,11 +149,26 @@ List<ContentField> fieldsFor(String resource) {
         ContentField(key: 'traditional_title', label: 'Traditional title'),
         ContentField(key: 'role_description', label: 'Role'),
         ContentField(key: 'area_represented', label: 'Area represented'),
-        ContentField(key: 'biography', label: 'Biography', multiline: true, lines: 8),
-        ContentField(key: 'contributions', label: 'Contributions', multiline: true, lines: 4),
+        ContentField(
+          key: 'biography',
+          label: 'Biography',
+          multiline: true,
+          lines: 8,
+        ),
+        ContentField(
+          key: 'contributions',
+          label: 'Contributions',
+          multiline: true,
+          lines: 4,
+        ),
         ContentField(key: 'reign_start', label: 'From'),
         ContentField(key: 'reign_end', label: 'Until'),
-        ContentField(key: 'source_reference', label: 'Source', multiline: true, lines: 2),
+        ContentField(
+          key: 'source_reference',
+          label: 'Source',
+          multiline: true,
+          lines: 2,
+        ),
         ContentField(
           key: 'verification_status',
           label: 'Verification',
@@ -147,32 +182,56 @@ List<ContentField> fieldsFor(String resource) {
         ContentField(key: 'headline', label: 'Headline'),
         ContentField(key: 'profession', label: 'Profession'),
         ContentField(key: 'category', label: 'Category'),
-        ContentField(key: 'biography', label: 'Biography', multiline: true, lines: 8),
-        ContentField(key: 'achievements', label: 'Achievements', multiline: true, lines: 4),
+        ContentField(
+          key: 'biography',
+          label: 'Biography',
+          multiline: true,
+          lines: 8,
+        ),
+        ContentField(
+          key: 'achievements',
+          label: 'Achievements',
+          multiline: true,
+          lines: 4,
+        ),
         ContentField(key: 'city', label: 'City'),
         ContentField(key: 'country', label: 'Country'),
         ContentField(key: 'website_url', label: 'Website'),
         ContentField(
           key: 'consent_reference',
           label: 'Consent record',
-          helper: 'How and when this person, or their family, agreed to be listed.',
+          helper:
+              'How and when this person, or their family, agreed to be listed.',
         ),
       ];
 
     case 'news':
       return const <ContentField>[
         title,
-        ContentField(key: 'excerpt', label: 'Summary', multiline: true, lines: 3),
+        ContentField(
+          key: 'excerpt',
+          label: 'Summary',
+          multiline: true,
+          lines: 3,
+        ),
         body,
         ContentField(key: 'category', label: 'Category'),
         ContentField(key: 'author_name', label: 'Author'),
-        ContentField(key: 'published_at', label: 'Publication date (YYYY-MM-DD)'),
+        ContentField(
+          key: 'published_at',
+          label: 'Publication date (YYYY-MM-DD)',
+        ),
       ];
 
     case 'events':
       return const <ContentField>[
         title,
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 6),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 6,
+        ),
         ContentField(key: 'start_datetime', label: 'Starts (YYYY-MM-DD)'),
         ContentField(key: 'end_datetime', label: 'Ends (YYYY-MM-DD)'),
         ContentField(key: 'venue', label: 'Venue'),
@@ -187,7 +246,12 @@ List<ContentField> fieldsFor(String resource) {
         ContentField(key: 'name', label: 'Festival name', required: true),
         ContentField(key: 'year', label: 'Year', required: true),
         ContentField(key: 'theme', label: 'Theme'),
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 8),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 8,
+        ),
         ContentField(key: 'start_date', label: 'Start date (YYYY-MM-DD)'),
         ContentField(key: 'end_date', label: 'End date (YYYY-MM-DD)'),
         ContentField(key: 'location', label: 'Location'),
@@ -201,7 +265,12 @@ List<ContentField> fieldsFor(String resource) {
           label: 'English meaning',
           helper: 'Leave blank unless a native speaker has confirmed it. A guess is worse than a gap.',
         ),
-        ContentField(key: 'definition', label: 'Definition', multiline: true, lines: 3),
+        ContentField(
+          key: 'definition',
+          label: 'Definition',
+          multiline: true,
+          lines: 3,
+        ),
         ContentField(key: 'example_sentence', label: 'Example sentence'),
         ContentField(key: 'example_translation', label: 'Example translation'),
         ContentField(key: 'part_of_speech', label: 'Part of speech'),
@@ -216,8 +285,161 @@ List<ContentField> fieldsFor(String resource) {
           key: 'entry_type',
           label: 'Entry type',
           options: <String>[
-            'word', 'phrase', 'greeting', 'proverb', 'idiom', 'number', 'name', 'song', 'riddle',
+            'word',
+            'phrase',
+            'greeting',
+            'proverb',
+            'idiom',
+            'number',
+            'name',
+            'song',
+            'riddle',
           ],
+        ),
+        ContentField(
+          key: 'verification_status',
+          label: 'Verification',
+          options: <String>['unverified', 'in_review', 'verified', 'disputed'],
+        ),
+      ];
+
+    case 'quizzes':
+      return const <ContentField>[
+        title,
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 3,
+        ),
+        ContentField(
+          key: 'subject',
+          label: 'Subject',
+          options: <String>[
+            'general',
+            'language',
+            'greetings',
+            'numbers',
+            'proverbs',
+            'history',
+            'culture',
+            'leboku',
+            'people',
+            'places',
+            'values',
+          ],
+        ),
+        ContentField(
+          key: 'level',
+          label: 'Level',
+          options: <String>['starter', 'growing', 'confident'],
+        ),
+        ContentField(
+          key: 'intro',
+          label: 'Introduction',
+          multiline: true,
+          lines: 3,
+        ),
+        ContentField(
+          key: 'closing',
+          label: 'Closing message',
+          multiline: true,
+          lines: 3,
+        ),
+        ContentField(
+          key: 'cover_media_id',
+          label: 'Cover image',
+          mediaKind: 'image',
+        ),
+      ];
+
+    case 'recordings':
+      return const <ContentField>[
+        title,
+        ContentField(
+          key: 'summary',
+          label: 'Summary',
+          multiline: true,
+          lines: 3,
+        ),
+        ContentField(key: 'speaker', label: 'Speaker'),
+        ContentField(
+          key: 'speaker_role',
+          label: 'Speaker’s role or connection',
+        ),
+        ContentField(
+          key: 'youtube_video_id',
+          label: 'YouTube link or video ID',
+        ),
+        ContentField(
+          key: 'audio_media_id',
+          label: 'Audio recording',
+          mediaKind: 'audio',
+        ),
+        ContentField(
+          key: 'transcript',
+          label: 'Transcript',
+          multiline: true,
+          lines: 12,
+        ),
+        ContentField(
+          key: 'transcript_language',
+          label: 'Transcript language',
+          options: <String>['ekoli', 'english', 'mixed', 'other'],
+        ),
+        ContentField(
+          key: 'english_interpretation',
+          label: 'English interpretation',
+          multiline: true,
+          lines: 8,
+        ),
+        ContentField(key: 'interpreted_by', label: 'Interpreted by'),
+        ContentField(
+          key: 'topic',
+          label: 'Topic',
+          options: <String>[
+            'other',
+            'life_in_old_ekori',
+            'history',
+            'traditional_practices',
+            'leboku',
+            'marriage',
+            'naming',
+            'farming',
+            'food',
+            'songs',
+            'folklore',
+            'proverbs',
+            'community_development',
+            'historical_events',
+            'people',
+          ],
+        ),
+        ContentField(key: 'recorded_at', label: 'Recorded on (YYYY-MM-DD)'),
+        ContentField(key: 'recorded_location', label: 'Recording location'),
+        ContentField(key: 'recorded_by', label: 'Recorded by'),
+        ContentField(
+          key: 'duration_seconds',
+          label: 'Duration in seconds',
+          integer: true,
+        ),
+        ContentField(
+          key: 'consent_reference',
+          label: 'Consent reference',
+          multiline: true,
+          lines: 3,
+          helper: 'Record who agreed, when, and what they agreed to. Required before approval or publication.',
+        ),
+        ContentField(
+          key: 'consent_note',
+          label: 'Consent notes',
+          multiline: true,
+          lines: 3,
+        ),
+        ContentField(
+          key: 'cover_media_id',
+          label: 'Cover image',
+          mediaKind: 'image',
         ),
         ContentField(
           key: 'verification_status',
@@ -235,13 +457,25 @@ List<ContentField> fieldsFor(String resource) {
           required: true,
           helper: 'Paste whatever your browser shows — the link is turned into an id for you.',
         ),
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 5),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 5,
+        ),
         ContentField(
           key: 'category',
           label: 'Category',
           options: <String>[
-            'leboku', 'history', 'interviews', 'culture', 'community', 'events',
-            'documentaries', 'music', 'oral_history',
+            'leboku',
+            'history',
+            'interviews',
+            'culture',
+            'community',
+            'events',
+            'documentaries',
+            'music',
+            'oral_history',
           ],
         ),
         ContentField(key: 'published_date', label: 'Published (YYYY-MM-DD)'),
@@ -258,7 +492,12 @@ List<ContentField> fieldsFor(String resource) {
     case 'galleries':
       return const <ContentField>[
         title,
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 4),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 4,
+        ),
         ContentField(key: 'category', label: 'Category'),
         ContentField(key: 'event_date', label: 'Date (YYYY-MM-DD)'),
         ContentField(key: 'location', label: 'Location'),
@@ -268,8 +507,18 @@ List<ContentField> fieldsFor(String resource) {
       return const <ContentField>[
         ContentField(key: 'name', label: 'Business name', required: true),
         ContentField(key: 'category', label: 'Category'),
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 5),
-        ContentField(key: 'services', label: 'Services', multiline: true, lines: 3),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 5,
+        ),
+        ContentField(
+          key: 'services',
+          label: 'Services',
+          multiline: true,
+          lines: 3,
+        ),
         ContentField(key: 'owner_name', label: 'Owner'),
         ContentField(key: 'phone', label: 'Phone'),
         ContentField(key: 'email', label: 'Email'),
@@ -281,8 +530,18 @@ List<ContentField> fieldsFor(String resource) {
       return const <ContentField>[
         ContentField(key: 'name', label: 'Organization name', required: true),
         ContentField(key: 'organization_type', label: 'Type'),
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 5),
-        ContentField(key: 'mission', label: 'Mission', multiline: true, lines: 3),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 5,
+        ),
+        ContentField(
+          key: 'mission',
+          label: 'Mission',
+          multiline: true,
+          lines: 3,
+        ),
         ContentField(key: 'founded_year', label: 'Founded'),
         ContentField(key: 'contact_name', label: 'Contact'),
         ContentField(key: 'phone', label: 'Phone'),
@@ -292,16 +551,48 @@ List<ContentField> fieldsFor(String resource) {
     case 'community':
       return const <ContentField>[
         title,
-        ContentField(key: 'description', label: 'Description', multiline: true, lines: 6),
-        ContentField(key: 'purpose', label: 'Purpose', multiline: true, lines: 3),
+        ContentField(
+          key: 'description',
+          label: 'Description',
+          multiline: true,
+          lines: 6,
+        ),
+        ContentField(
+          key: 'purpose',
+          label: 'Purpose',
+          multiline: true,
+          lines: 3,
+        ),
         ContentField(key: 'location', label: 'Location'),
         ContentField(key: 'committee', label: 'Committee'),
+        ContentField(
+          key: 'funding_target',
+          label: 'Funding target',
+          amount: true,
+          helper: 'Enter the amount in the selected currency.',
+        ),
+        ContentField(key: 'funds_raised', label: 'Funds raised', amount: true),
+        ContentField(
+          key: 'currency',
+          label: 'Currency code',
+          required: true,
+          helper: 'Three capital letters, for example NGN, USD or GBP.',
+        ),
+        ContentField(
+          key: 'completion_date',
+          label: 'Completion date (YYYY-MM-DD)',
+        ),
         ContentField(key: 'progress_percent', label: 'Progress (0–100)'),
         ContentField(
           key: 'project_status',
           label: 'Project status',
           options: <String>[
-            'proposed', 'fundraising', 'in_progress', 'completed', 'paused', 'cancelled',
+            'proposed',
+            'fundraising',
+            'in_progress',
+            'completed',
+            'paused',
+            'cancelled',
           ],
         ),
         ContentField(key: 'start_date', label: 'Start date (YYYY-MM-DD)'),
@@ -313,26 +604,35 @@ List<ContentField> fieldsFor(String resource) {
 }
 
 class _ContentEditorDialogState extends State<ContentEditorDialog> {
-  final Map<String, TextEditingController> _controllers = <String, TextEditingController>{};
+  final Map<String, TextEditingController> _controllers =
+      <String, TextEditingController>{};
   final Map<String, String> _dropdowns = <String, String>{};
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _busy = false;
   String? _error;
   late List<ContentField> _fields;
+  ContentRecord? _savedRecord;
+  bool _hasSaved = false;
+  final GlobalKey<QuizQuestionsEditorState> _questionsKey =
+      GlobalKey<QuizQuestionsEditorState>();
 
-  bool get _isNew => widget.record == null;
+  bool get _isNew => _savedRecord == null;
 
   @override
   void initState() {
     super.initState();
+    _savedRecord = widget.record;
     _fields = fieldsFor(widget.resource);
 
     for (final ContentField field in _fields) {
       final dynamic existing = widget.record?.raw[field.key];
-      final String value = existing?.toString() ?? '';
+      final String value =
+          existing?.toString() ?? (field.key == 'currency' ? 'NGN' : '');
       if (field.options != null) {
-        _dropdowns[field.key] = field.options!.contains(value) ? value : field.options!.first;
+        _dropdowns[field.key] = field.options!.contains(value)
+            ? value
+            : field.options!.first;
       } else {
         _controllers[field.key] = TextEditingController(text: value);
       }
@@ -356,8 +656,22 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       }
       final String text = _controllers[field.key]?.text.trim() ?? '';
       // `year`, `founded_year` and `progress_percent` are integers server-side.
-      if (text.isEmpty) continue;
-      if (<String>['year', 'founded_year', 'progress_percent'].contains(field.key)) {
+      if (text.isEmpty) {
+        if (!_isNew && _savedRecord?.raw[field.key] != null) {
+          values[field.key] = null;
+        }
+        continue;
+      }
+      if (field.amount) {
+        values[field.key] = double.parse(text);
+        continue;
+      }
+      if (field.integer ||
+          <String>[
+            'year',
+            'founded_year',
+            'progress_percent',
+          ].contains(field.key)) {
         final int? parsed = int.tryParse(text);
         if (parsed != null) values[field.key] = parsed;
         continue;
@@ -370,18 +684,54 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
   Future<void> _save({String? thenSetStatus}) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    if (widget.resource == 'quizzes' &&
+        !(_questionsKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    if (widget.resource == 'recordings') {
+      if ((_controllers['youtube_video_id']?.text.trim().isEmpty ?? true) &&
+          (_controllers['audio_media_id']?.text.trim().isEmpty ?? true)) {
+        setState(
+          () => _error = 'Choose an audio recording or enter a YouTube link.',
+        );
+        return;
+      }
+      if (thenSetStatus == ContentStatus.published &&
+          (_controllers['consent_reference']?.text.trim().isEmpty ?? true)) {
+        setState(
+          () => _error = 'Record consent before publishing this interview.',
+        );
+        return;
+      }
+    }
+
     setState(() {
       _busy = true;
       _error = null;
     });
 
     try {
-      final ContentRepository repository = context.contentRepository(widget.resource);
+      final ContentRepository repository = context.contentRepository(
+        widget.resource,
+      );
+      final quizApi = context.read<ApiClient>();
       final Map<String, dynamic> values = _collect();
 
       final ContentRecord saved = _isNew
           ? await repository.create(values)
-          : await repository.update(widget.record!.id, values);
+          : await repository.update(_savedRecord!.id, values);
+      // Keep the ID if saving the question set or publication fails: retrying
+      // must update this draft rather than create another copy.
+      _savedRecord = saved;
+      _hasSaved = true;
+      if (widget.resource == 'quizzes') {
+        await quizApi.put(
+          '/api/editorial/quizzes/${saved.id}/questions',
+          body: <String, dynamic>{
+            'questions': _questionsKey.currentState!.collect(),
+          },
+        );
+      }
 
       if (thenSetStatus != null) {
         await repository.changeStatus(saved.id, thenSetStatus);
@@ -394,7 +744,8 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
           _error = <String>[
             error.message,
             ...error.fieldErrors.entries.map(
-              (MapEntry<String, List<String>> e) => '${e.key}: ${e.value.join(', ')}',
+              (MapEntry<String, List<String>> e) =>
+                  '${e.key}: ${e.value.join(', ')}',
             ),
           ].join('\n');
         });
@@ -411,90 +762,137 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
     final ThemeData theme = Theme.of(context);
     final AuthController auth = context.watch<AuthController>();
 
-    return AlertDialog(
-      title: Text(_isNew ? 'New ${widget.title.toLowerCase()}' : 'Edit ${widget.title.toLowerCase()}'),
-      content: SizedBox(
-        width: 640,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                if (!_isNew) ...<Widget>[
-                  Row(
-                    children: <Widget>[
-                      Text('Current status: ', style: theme.textTheme.bodySmall),
-                      Text(
-                        ContentStatus.label(widget.record!.status),
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        title: Text(
+          _isNew
+              ? 'New ${widget.resource == 'community' ? 'community project' : widget.title.toLowerCase()}'
+              : 'Edit ${widget.resource == 'community' ? 'community project' : widget.title.toLowerCase()}',
+        ),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: AbsorbPointer(
+              absorbing: _busy,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    if (!_isNew) ...<Widget>[
+                      Row(
+                        children: <Widget>[
+                          Text(
+                            'Current status: ',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          Text(
+                            ContentStatus.label(_savedRecord!.status),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Gap.md(),
+                    ],
+
+                    ..._fields.map(_buildField),
+                    if (widget.resource == 'quizzes')
+                      QuizQuestionsEditor(
+                        key: _questionsKey,
+                        quizId: widget.record?.id,
+                      ),
+
+                    if (_error != null) ...<Widget>[
+                      const Gap.md(),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.errorContainer.withValues(
+                            alpha: 0.4,
+                          ),
+                          borderRadius: AppRadius.smAll,
+                        ),
+                        child: Text(
+                          _error!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  const Gap.md(),
-                ],
-
-                ..._fields.map(_buildField),
-
-                if (_error != null) ...<Widget>[
-                  const Gap.md(),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-                      borderRadius: AppRadius.smAll,
-                    ),
-                    child: Text(
-                      _error!,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                    ),
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        OutlinedButton(
-          onPressed: _busy ? null : _save,
-          child: const Text('Save draft'),
-        ),
-        if (auth.can('content.submit') || auth.canPublish)
+        actions: <Widget>[
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => Navigator.of(context).pop(_hasSaved),
+            child: const Text('Cancel'),
+          ),
           OutlinedButton(
-            onPressed: _busy ? null : () => _save(thenSetStatus: ContentStatus.pendingReview),
-            child: const Text('Save & submit'),
+            onPressed: _busy ? null : _save,
+            child: Text(
+              _savedRecord?.status == ContentStatus.published
+                  ? 'Save changes'
+                  : 'Save draft',
+            ),
           ),
-        // Publishing appears only where the account holds it. The server
-        // re-checks; this only avoids offering a button that would 403.
-        if (auth.canPublish)
-          FilledButton(
-            onPressed: _busy ? null : () => _save(thenSetStatus: ContentStatus.published),
-            child: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Save & publish'),
-          ),
-      ],
+          if (auth.can('content.submit') || auth.canPublish)
+            OutlinedButton(
+              onPressed: _busy
+                  ? null
+                  : () => _save(thenSetStatus: ContentStatus.pendingReview),
+              child: const Text('Save & submit'),
+            ),
+          // Publishing appears only where the account holds it. The server
+          // re-checks; this only avoids offering a button that would 403.
+          if (auth.canPublish)
+            FilledButton(
+              onPressed: _busy
+                  ? null
+                  : () => _save(thenSetStatus: ContentStatus.published),
+              child: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Save & publish'),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildField(ContentField field) {
+    if (field.mediaKind != null) {
+      return MediaSelectionField(
+        label: field.label,
+        kind: field.mediaKind!,
+        controller: _controllers[field.key]!,
+      );
+    }
     if (field.options != null) {
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.md),
         child: DropdownButtonFormField<String>(
           initialValue: _dropdowns[field.key],
-          decoration: InputDecoration(labelText: field.label, helperText: field.helper),
+          decoration: InputDecoration(
+            labelText: field.label,
+            helperText: field.helper,
+          ),
           items: field.options!
               .map(
                 (String option) => DropdownMenuItem<String>(
@@ -503,8 +901,9 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
                 ),
               )
               .toList(growable: false),
-          onChanged: (String? value) =>
-              setState(() => _dropdowns[field.key] = value ?? _dropdowns[field.key]!),
+          onChanged: (String? value) => setState(
+            () => _dropdowns[field.key] = value ?? _dropdowns[field.key]!,
+          ),
         ),
       );
     }
@@ -513,6 +912,11 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: TextFormField(
         controller: _controllers[field.key],
+        keyboardType: field.amount
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : field.integer
+            ? TextInputType.number
+            : null,
         maxLines: field.multiline ? field.lines : 1,
         minLines: field.multiline ? 3 : 1,
         decoration: InputDecoration(
@@ -521,10 +925,27 @@ class _ContentEditorDialogState extends State<ContentEditorDialog> {
           helperMaxLines: 3,
           alignLabelWithHint: field.multiline,
         ),
-        validator: field.required
-            ? (String? value) =>
-                (value == null || value.trim().isEmpty) ? '${field.label} is required.' : null
-            : null,
+        validator: (String? value) {
+          final text = value?.trim() ?? '';
+          if (field.key == 'currency' && !RegExp(r'^[A-Z]{3}$').hasMatch(text)) {
+            return 'Enter a three-letter capital currency code.';
+          }
+          if (field.amount && text.isNotEmpty) {
+            final value = double.tryParse(text);
+            if (value == null || !value.isFinite || value < 0 || value > 1e15) {
+              return 'Enter a valid, non-negative amount.';
+            }
+          }
+          if (field.required && text.isEmpty) {
+            return '${field.label} is required.';
+          }
+          if (field.integer &&
+              text.isNotEmpty &&
+              (int.tryParse(text) == null || int.parse(text) < 0)) {
+            return 'Enter a non-negative whole number.';
+          }
+          return null;
+        },
       ),
     );
   }

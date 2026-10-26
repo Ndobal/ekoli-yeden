@@ -67,6 +67,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   /// changed every time Flutter repainted would be unusable.
   List<Photograph> _pool = const <Photograph>[];
   bool _poolRequested = false;
+  int _autoplaySlideCount = 0;
 
   Future<void> _loadPool() async {
     if (_poolRequested) return;
@@ -98,10 +99,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   void _startAutoplay(int slideCount) {
     _timer?.cancel();
+    _autoplaySlideCount = slideCount;
     if (slideCount < 2 || _userTookControl) return;
 
     _timer = Timer.periodic(_interval, (_) {
-      if (!mounted || _paused) return;
+      if (!mounted || _paused || !_controller.hasClients) return;
       final int next = (_index + 1) % slideCount;
       _controller.animateToPage(
         next,
@@ -126,7 +128,25 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   Widget build(BuildContext context) {
     final CmsController cms = context.watch<CmsController>();
-    final List<HeroSlide> slides = cms.heroSlides.isEmpty ? _fallbackSlides : cms.heroSlides;
+    final List<HeroSlide> slides = cms.isLoaded && cms.isApiReachable ? cms.heroSlides : _fallbackSlides;
+    if (slides.isEmpty) {
+      _timer?.cancel();
+      _timer = null;
+      _autoplaySlideCount = 0;
+      _index = 0;
+      return const SizedBox.shrink();
+    }
+    if (_autoplaySlideCount != slides.length) {
+      _timer?.cancel();
+      _timer = null;
+      _autoplaySlideCount = slides.length;
+      if (_index >= slides.length) {
+        _index = 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _controller.hasClients) _controller.jumpToPage(0);
+        });
+      }
+    }
 
     // Deferred: `context.read` is not safe during build itself.
     if (!_poolRequested) {

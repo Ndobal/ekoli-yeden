@@ -1,3 +1,5 @@
+import '../../features/workspace/layout_workspace_page.dart';
+import '../../features/workspace/map_coordinates_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -619,12 +621,14 @@ GoRouter buildRouter(AuthController auth) {
       ),
       GoRoute(
         path: AppRoutes.editorialHomepage,
-        builder: (_, _) => const EditorialTextPage(group: 'home', title: 'Homepage text'),
+        builder: (_, _) => const LayoutWorkspacePage(kind: 'hero'),
       ),
       GoRoute(
         path: AppRoutes.editorialNavigation,
-        builder: (_, _) => const EditorialTextPage(group: 'navigation', title: 'Navigation'),
+        builder: (_, _) => const LayoutWorkspacePage(kind: 'navigation'),
       ),
+      GoRoute(path: AppRoutes.editorialHomepageText, builder: (_, _) => const EditorialTextPage(group: 'home', title: 'Homepage text')),
+      GoRoute(path: AppRoutes.editorialMap, builder: (_, _) => const MapCoordinatesPage()),
       GoRoute(
         path: AppRoutes.editorialMedia,
         builder: (_, _) => const MediaLibraryPage(workspace: WorkspaceKind.editorial),

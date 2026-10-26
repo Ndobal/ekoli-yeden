@@ -1,6 +1,6 @@
 import type { RouteDefinition } from '../types/api';
 import { requireAnyPermission } from '../middleware/auth';
-import { hallOfFame, mapPlaces, setPlaceCoordinates } from '../controllers/discover.controller';
+import { hallOfFame, mapPlaces, editorialMapPlaces, setPlaceCoordinates } from '../controllers/discover.controller';
 import { showQuiz, replaceQuestions, editorialQuestions } from '../controllers/learning.controller';
 
 /**
@@ -38,6 +38,12 @@ export const discoverRoutes: RouteDefinition[] = [
     path: '/api/learn/quizzes/:identifier',
     handler: showQuiz,
     description: 'One published quiz with its questions, marked in the browser',
+  },
+
+  {
+    method: 'GET', path: '/api/editorial/map/places', handler: editorialMapPlaces,
+    middleware: [requireAnyPermission(['history:update', 'people:update'])],
+    description: 'All places, including unpublished ones, for coordinate editors',
   },
 
   // --- Editorial -----------------------------------------------------------

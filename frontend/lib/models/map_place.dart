@@ -35,6 +35,7 @@ class MapPlace {
     required this.slug,
     required this.name,
     this.kind = 'quarter',
+    this.status = 'published',
     this.description,
     this.knownFor,
     this.latitude,
@@ -48,6 +49,7 @@ class MapPlace {
     slug: Json.str(json, 'slug'),
     name: Json.str(json, 'name'),
     kind: Json.str(json, 'kind', fallback: 'quarter'),
+    status: Json.str(json, 'status', fallback: 'published'),
     description: Json.strOrNull(json, 'description'),
     knownFor: Json.strOrNull(json, 'known_for'),
     latitude: Json.doubleOrNull(json, 'latitude'),
@@ -60,6 +62,7 @@ class MapPlace {
   final String slug;
   final String name;
   final String kind;
+  final String status;
   final String? description;
   final String? knownFor;
   final double? latitude;

@@ -71,7 +71,14 @@ export function adminCreate(resource: ContentResource): Handler {
   return async (context: RequestContext) => {
     const actor = requireActor(context);
     const body = await readJsonBody(context.request);
+    if ((resource.key === 'recordings' || resource.key === 'quizzes') && 'status' in body && body['status'] !== 'draft') {
+      throw new ValidationError({ status: ['Create a draft, then use the review and publishing controls.'] });
+    }
     validateCommonFields(resource, body);
+    if (typeof body['status'] === 'string' && !hasPermission(actor, permissionForStatus(resource.key, body['status'] as ContentStatus))) {
+      throw new ForbiddenError('You do not have permission to change this publication status.');
+    }
+    await validateEditorialRecord(context, resource, body);
 
     const service = new ContentService(context.env.DB, resource);
     const created = await service.create(body, actor);
@@ -88,10 +95,18 @@ export function adminUpdate(resource: ContentResource): Handler {
   return async (context: RequestContext) => {
     const actor = requireActor(context);
     const body = await readJsonBody(context.request);
+    if ((resource.key === 'recordings' || resource.key === 'quizzes') && 'status' in body) {
+      throw new ValidationError({ status: ['Use the review and publishing controls to change status.'] });
+    }
     validateCommonFields(resource, body);
+    if (typeof body['status'] === 'string' && !hasPermission(actor, permissionForStatus(resource.key, body['status'] as ContentStatus))) {
+      throw new ForbiddenError('You do not have permission to change this publication status.');
+    }
 
     const id = context.params['id'] ?? '';
     const service = new ContentService(context.env.DB, resource);
+    const existing = await service.findOne(id, true);
+    await validateEditorialRecord(context, resource, { ...existing, ...body });
     const updated = await service.update(id, body, actor);
 
     await audit(context, AUDIT_ACTIONS.CONTENT_UPDATED, resource, id, {
@@ -154,6 +169,21 @@ export function adminChangeStatus(resource: ContentResource): Handler {
           + 'and what they agreed to, before approving it.',
         );
       }
+    }
+
+    if (resource.key === 'quizzes' && (target === 'published' || target === 'approved')) {
+      const questions = await context.env.DB.prepare(
+        `SELECT q."id", COUNT(o."id") AS option_count, SUM(o."is_correct") AS correct_count
+         FROM "quiz_questions" q LEFT JOIN "quiz_options" o ON o."question_id" = q."id"
+         WHERE q."quiz_id" = ? GROUP BY q."id"`,
+      ).bind(id).all<{ id: string; option_count: number; correct_count: number }>();
+      if (!questions.results?.length || questions.results.some(q => q.option_count < 2 || q.option_count > 6 || q.correct_count !== 1)) {
+        throw new ValidationError({ questions: ['Add questions with two to six answers and one correct answer before approval or publication.'] });
+      }
+    }
+    if (resource.key === 'recordings' || resource.key === 'quizzes') {
+      const existing = await service.findOne(id, true);
+      await validateEditorialRecord(context, resource, { ...existing, status: target });
     }
 
     const updated = await service.changeStatus(
@@ -229,20 +259,26 @@ function validateCommonFields(resource: ContentResource, body: Record<string, un
   if ('youtube_video_id' in body) {
     validator.youtubeVideoId('youtube_video_id', { required: resource.key === 'videos' });
   }
-  // A recording is film, or audio, or both — the table's own CHECK says so.
-  // Caught here as well so the person filling the form is told which field is
-  // missing rather than being handed a constraint failure.
-  if (resource.key === 'recordings' && ('youtube_video_id' in body || 'audio_media_id' in body)) {
-    const film = body['youtube_video_id'];
-    const audio = body['audio_media_id'];
-    const hasFilm = typeof film === 'string' && film.trim().length > 0;
-    const hasAudio = typeof audio === 'string' && audio.trim().length > 0;
-    if (!hasFilm && !hasAudio) {
-      throw new ValidationError(
-        { audio_media_id: ['Add a YouTube film or an audio recording.'] },
-        'A recording needs either a film or an audio file.',
-      );
+  if (resource.key === 'community') {
+    for (const field of ['funding_target', 'funds_raised']) {
+      const value = body[field];
+      if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1e15)) {
+        throw new ValidationError({ [field]: ['Enter an amount from zero to 1,000,000,000,000,000.'] });
+      }
     }
+    if ('currency' in body) validator.string('currency', { required: true, pattern: /^[A-Z]{3}$/, label: 'Currency code' });
+    if ('progress_percent' in body) validator.integer('progress_percent', { min: 0, max: 100, required: true });
+    if (body['start_date']) validator.date('start_date');
+    if (body['completion_date']) validator.date('completion_date');
+  }
+  if (resource.key === 'quizzes') {
+    if ('subject' in body) validator.oneOf('subject', ['general', 'language', 'greetings', 'numbers', 'proverbs', 'history', 'culture', 'leboku', 'people', 'places', 'values']);
+    if ('level' in body) validator.oneOf('level', ['starter', 'growing', 'confident']);
+  }
+  if (resource.key === 'recordings') {
+    if ('duration_seconds' in body) validator.integer('duration_seconds', { min: 0 });
+    if (body['recorded_at']) validator.date('recorded_at');
+    if ('transcript_language' in body) validator.oneOf('transcript_language', ['ekoli', 'english', 'mixed', 'other']);
   }
   // A dictionary word is often several parts of speech at once — a noun and a
   // verb — so the column holds a JSON array. Accepted from the client as a real
@@ -255,6 +291,42 @@ function validateCommonFields(resource: ContentResource, body: Record<string, un
   // Fold normalised values (lowercased email, extracted video id, parsed
   // integers) back into the payload so the repository stores the clean form.
   for (const [key, value] of Object.entries(normalised)) body[key] = value;
+}
+
+/** Validate complete records, including existing fields on a partial update. */
+async function validateEditorialRecord(context: RequestContext, resource: ContentResource, record: Record<string, unknown>): Promise<void> {
+  if (resource.key !== 'recordings' && resource.key !== 'quizzes') return;
+  const isPublic = record['status'] === 'published' || record['status'] === 'approved';
+  if (resource.key === 'recordings') {
+    if (!record['youtube_video_id'] && !record['audio_media_id']) {
+      throw new ValidationError({ audio_media_id: ['Choose an audio recording or enter a YouTube link.'] });
+    }
+    if (isPublic && (typeof record['consent_reference'] !== 'string' || !record['consent_reference'].trim())) {
+      throw new ValidationError({ consent_reference: ['Record consent before approval or publication.'] });
+    }
+  }
+  if (resource.key === 'quizzes' && isPublic && record['id']) {
+    const unavailable = await context.env.DB.prepare(
+      `SELECT q."id" FROM "quiz_questions" q
+       LEFT JOIN "media_assets" m ON m."id" = q."audio_media_id"
+       WHERE q."quiz_id" = ? AND q."audio_media_id" IS NOT NULL
+         AND (m."id" IS NULL OR m."status" != 'published' OR m."mime_type" NOT LIKE 'audio/%') LIMIT 1`,
+    ).bind(record['id']).first();
+    if (unavailable) throw new ValidationError({ questions: ['Publish question audio in the media library first.'] });
+  }
+  for (const [field, prefix] of [['audio_media_id', 'audio/'], ['cover_media_id', 'image/']] as const) {
+    const id = record[field];
+    if (id === null || id === undefined) continue;
+    if (typeof id !== 'string' || !id.trim()) throw new ValidationError({ [field]: ['Choose a valid file.'] });
+    const media = await context.env.DB.prepare('SELECT "mime_type", "status" FROM "media_assets" WHERE "id" = ?')
+      .bind(id).first<{ mime_type: string; status: string }>();
+    if (!media || !media.mime_type.startsWith(prefix)) {
+      throw new ValidationError({ [field]: [`Choose an ${prefix === 'audio/' ? 'audio recording' : 'image'} from the media library.`] });
+    }
+    if (isPublic && media.status !== 'published') {
+      throw new ValidationError({ [field]: ['Publish this file in the media library before publishing the record.'] });
+    }
+  }
 }
 
 /** Videos gain their derived YouTube URLs; every other resource passes through. */

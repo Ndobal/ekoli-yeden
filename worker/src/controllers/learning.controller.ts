@@ -144,15 +144,18 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
   const actor = requireActor(context);
   const quizId = context.params['id'] ?? '';
 
-  const quiz = await context.env.DB.prepare(`SELECT "id" FROM "quizzes" WHERE "id" = ? LIMIT 1`)
+  const quiz = await context.env.DB.prepare(`SELECT "id", "status" FROM "quizzes" WHERE "id" = ? LIMIT 1`)
     .bind(quizId)
-    .first<{ id: string }>();
+    .first<{ id: string; status: string }>();
   if (!quiz) throw new NotFoundError('That quiz could not be found.');
 
   const body = await readJsonBody(context.request);
   const incoming = body['questions'];
   if (!Array.isArray(incoming)) {
     throw new ValidationError({ questions: ['Send a list of questions.'] });
+  }
+  if (incoming.length === 0) {
+    throw new ValidationError({ questions: ['Add at least one question.'] });
   }
   if (incoming.length > 50) {
     throw new ValidationError({ questions: ['A quiz may have at most 50 questions.'] });
@@ -166,6 +169,9 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
   ];
 
   incoming.forEach((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new ValidationError({ questions: [`Question ${index + 1} must be an object.`] });
+    }
     const question = raw as Record<string, unknown>;
     const validated = new Validator(question)
       .string('prompt', { required: true, max: 500, label: 'Question' })
@@ -185,6 +191,9 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
       });
     }
 
+    if (options.some((option) => !option || typeof option !== 'object' || Array.isArray(option))) {
+      throw new ValidationError({ questions: [`Question ${index + 1} contains an invalid answer.`] });
+    }
     const correct = options.filter(
       (option) => (option as Record<string, unknown>)['is_correct'] === true,
     );
@@ -219,6 +228,9 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
     options.forEach((rawOption, optionIndex) => {
       const option = rawOption as Record<string, unknown>;
       const label = typeof option['label'] === 'string' ? option['label'].trim() : '';
+      if (label.length > 300) {
+        throw new ValidationError({ questions: [`An answer on question ${index + 1} exceeds 300 characters.`] });
+      }
       if (!label) {
         throw new ValidationError({
           questions: [`An answer on question ${index + 1} has no text.`],
@@ -232,7 +244,7 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
         ).bind(
           newId(),
           questionId,
-          label.slice(0, 300),
+          label,
           option['is_correct'] === true ? 1 : 0,
           optionIndex,
           now,
@@ -242,6 +254,21 @@ export const replaceQuestions: Handler = async (context: RequestContext) => {
     });
   });
 
+  for (const raw of incoming) {
+    const audioId = (raw as Record<string, unknown>)['audio_media_id'];
+    if (audioId === undefined || audioId === null) continue;
+    if (typeof audioId !== 'string' || !audioId.trim()) {
+      throw new ValidationError({ questions: ['Choose a valid question audio recording.'] });
+    }
+    const media = await context.env.DB.prepare('SELECT "mime_type", "status" FROM "media_assets" WHERE "id" = ?')
+      .bind(audioId).first<{ mime_type: string; status: string }>();
+    if (!media || !media.mime_type.startsWith('audio/')) {
+      throw new ValidationError({ questions: ['Choose an audio file from the media library.'] });
+    }
+    if ((quiz.status === 'published' || quiz.status === 'approved') && media.status !== 'published') {
+      throw new ValidationError({ questions: ['Publish question audio in the media library first.'] });
+    }
+  }
   await context.env.DB.batch(statements);
 
   await new AuditRepository(context.env.DB).record({

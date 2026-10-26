@@ -74,12 +74,12 @@ class Formatters {
     return value == null ? fallback : _decimal.format(value);
   }
 
-  static String currency(num? value, String currencyCode, {String fallback = '—'}) {
+  static String currency(num? value, String currencyCode, {String fallback = '—', int decimalDigits = 0}) {
     if (value == null) return fallback;
     return NumberFormat.currency(
       name: currencyCode,
       symbol: currencyCode == 'NGN' ? '₦' : '$currencyCode ',
-      decimalDigits: 0,
+      decimalDigits: decimalDigits,
     ).format(value);
   }
 

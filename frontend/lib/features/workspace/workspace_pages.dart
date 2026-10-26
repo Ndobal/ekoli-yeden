@@ -12,15 +12,15 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/async_content.dart';
 import '../../core/widgets/state_views.dart';
 import '../../models/content_record.dart';
-import '../../models/content_status.dart';
 import '../../repositories/admin_repository.dart';
-import '../../repositories/cms_repository.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/submission_repository.dart';
 import '../../services/api/api_response.dart';
 import '../../services/auth/auth_controller.dart';
 import '../editorial/editorial_shell.dart';
 import 'media_library_page.dart';
+import 'settings_form.dart';
+import 'source_tools.dart';
 
 /// Screens shared between the Editorial and Administration workspaces.
 ///
@@ -279,124 +279,16 @@ class _Fact extends StatelessWidget {
 /// many records, and its reliability is stated rather than assumed.
 class SourcesPage extends StatelessWidget {
   const SourcesPage({required this.workspace, super.key});
-
   final WorkspaceKind workspace;
-
   @override
   Widget build(BuildContext context) {
-    final bool isAdmin = workspace == WorkspaceKind.admin;
-    final ThemeData theme = Theme.of(context);
-
+    final isAdmin = workspace == WorkspaceKind.admin;
     return WorkspaceShell(
       currentPath: isAdmin ? AppRoutes.adminSources : AppRoutes.editorialSources,
-      title: 'Sources & references',
-      workspaceName: isAdmin ? 'Administration' : 'Editorial',
+      title: 'Sources & references', workspaceName: isAdmin ? 'Administration' : 'Editorial',
       accent: isAdmin ? AppColors.gold : AppColors.skyBlue,
       navigation: isAdmin ? adminNavigation : editorialNavigation,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const AdminNote(
-            message:
-                'Every historical claim in the archive should name where it came from. A source '
-                'recorded here can be cited by any number of records, and its reliability is '
-                'stated — a community blog post and an interview with an elder are both useful '
-                'and are not the same thing.',
-          ),
-          const Gap.xl(),
-          AsyncContent<Map<String, dynamic>>(
-            load: () => context.read<CmsRepository>().sources(),
-            loadingMessage: 'Loading the citation library…',
-            builder: (BuildContext context, Map<String, dynamic> data) {
-              final List<Map<String, dynamic>> sources = Json.objectList(data, 'sources');
-              if (sources.isEmpty) {
-                return const EmptyView(
-                  icon: Icons.menu_book_outlined,
-                  title: 'No sources recorded',
-                  message: 'Sources are added as material is researched and cited.',
-                  showContributeAction: false,
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: sources.map((Map<String, dynamic> source) {
-                  final String reliability = Json.str(source, 'reliability', fallback: 'unassessed');
-                  final bool contested = reliability == 'contested';
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: AppRadius.mdAll,
-                        border: Border(
-                          left: BorderSide(
-                            color: contested ? AppColors.danger : AppColors.navy,
-                            width: 3,
-                          ),
-                          top: BorderSide(color: theme.colorScheme.outlineVariant),
-                          right: BorderSide(color: theme.colorScheme.outlineVariant),
-                          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(Json.str(source, 'title'), style: theme.textTheme.titleMedium),
-                          if (Json.strOrNull(source, 'author') != null) ...<Widget>[
-                            const Gap.xs(),
-                            Text(
-                              Json.str(source, 'author'),
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                          if (Json.strOrNull(source, 'url') != null) ...<Widget>[
-                            const Gap.xs(),
-                            SelectableText(
-                              Json.str(source, 'url'),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: AppColors.navyLight,
-                              ),
-                            ),
-                          ],
-                          const Gap.sm(),
-                          Wrap(
-                            spacing: AppSpacing.sm,
-                            children: <Widget>[
-                              Chip(
-                                label: Text(reliability.replaceAll('_', ' ')),
-                                backgroundColor:
-                                    (contested ? AppColors.danger : AppColors.inkMuted)
-                                        .withValues(alpha: 0.10),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              Chip(
-                                label: Text(Json.str(source, 'source_type', fallback: 'web')),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-                          if (Json.strOrNull(source, 'notes') != null) ...<Widget>[
-                            const Gap.sm(),
-                            Text(
-                              Json.str(source, 'notes'),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(growable: false),
-              );
-            },
-          ),
-        ],
-      ),
+      child: const SourcesManager(),
     );
   }
 }
@@ -589,112 +481,16 @@ class AdminContentPage extends StatelessWidget {
 /// Site settings.
 class AdminSettingsPage extends StatelessWidget {
   const AdminSettingsPage({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return WorkspaceShell(
-      currentPath: AppRoutes.adminSettings,
-      title: 'Site settings',
-      workspaceName: 'Administration',
-      accent: AppColors.gold,
-      navigation: adminNavigation,
-      child: AsyncContent<Map<String, dynamic>>(
-        load: () => context.read<SettingsRepository>().adminSettings(),
-        loadingMessage: 'Loading settings…',
-        builder: (BuildContext context, Map<String, dynamic> data) {
-          final Map<String, dynamic> groups =
-              (data['groups'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const AdminNote(
-                message:
-                    'Settings an administrator can change without a deployment: the site name, '
-                    'contact details, social links and which sections are shown. Values left empty '
-                    'have not been supplied by the community yet — nothing has been invented to '
-                    'fill them.',
-              ),
-              const Gap.xxl(),
-              ...groups.entries.map((MapEntry<String, dynamic> entry) {
-                final List<Map<String, dynamic>> rows =
-                    (entry.value as List<dynamic>).whereType<Map<String, dynamic>>().toList();
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(entry.key, style: theme.textTheme.headlineSmall),
-                      const Gap.md(),
-                      ...rows.map(
-                        (Map<String, dynamic> row) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: AppRadius.smAll,
-                              border: Border.all(color: theme.colorScheme.outlineVariant),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                SizedBox(
-                                  width: 280,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                        Json.str(row, 'key'),
-                                        style: theme.textTheme.titleSmall?.copyWith(
-                                          fontFamily: 'monospace',
-                                        ),
-                                      ),
-                                      if (Json.strOrNull(row, 'description') != null)
-                                        Text(
-                                          Json.str(row, 'description'),
-                                          style: theme.textTheme.labelSmall,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                const Gap.hLg(),
-                                Expanded(
-                                  child: Text(
-                                    Json.strOrNull(row, 'value') ?? 'not set',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontStyle: Json.strOrNull(row, 'value') == null
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                      color: Json.strOrNull(row, 'value') == null
-                                          ? theme.colorScheme.onSurfaceVariant
-                                          : null,
-                                    ),
-                                  ),
-                                ),
-                                if (Json.boolVal(row, 'isPublic'))
-                                  const Chip(
-                                    label: Text('public'),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => WorkspaceShell(
+    currentPath: AppRoutes.adminSettings, title: 'Site settings',
+    workspaceName: 'Administration', accent: AppColors.gold, navigation: adminNavigation,
+    child: AsyncContent<Map<String, dynamic>>(
+      load: () => context.read<SettingsRepository>().adminSettings(),
+      loadingMessage: 'Loading settings…',
+      builder: (context, data) => SettingsForm(groups: (data['groups'] as Map<String, dynamic>?) ?? <String, dynamic>{}),
+    ),
+  );
 }
 
 /// The security posture of the platform, stated plainly.

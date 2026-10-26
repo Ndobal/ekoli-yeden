@@ -1,11 +1,12 @@
 import type { Handler, RequestContext } from '../types/api';
 import { SettingsRepository } from '../repositories/settings.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
-import { NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors';
+import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors';
 import { json, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
 import { readJsonBody } from '../utils/validation';
 import { publicMediaUrl } from '../utils/files';
-import { nowIso } from '../utils/id';
+import { diffRecords } from '../repositories/editorial.repository';
+import { nowIso, newId } from '../utils/id';
 
 /**
  * DISCOVER EKORI — §13 and §16 of the proposal.
@@ -109,14 +110,16 @@ export const hallOfFame: Handler = async (context: RequestContext) => {
  * is nothing. `bounds` is computed from real coordinates only, and is null
  * until at least one place has been marked.
  */
-export const mapPlaces: Handler = async (context: RequestContext) => {
+export const mapPlaces: Handler = (context) => readMap(context, true);
+export const editorialMapPlaces: Handler = (context) => readMap(context, false);
+async function readMap(context: RequestContext, publishedOnly: boolean): Promise<Response> {
   const result = await context.env.DB.prepare(
     `SELECT p."id", p."slug", p."name", p."kind", p."description", p."known_for",
-            p."latitude", p."longitude", p."parent_id", p."depth",
+            p."latitude", p."longitude", p."parent_id", p."depth", p."status",
             m."storage_key" AS cover_key
      FROM "places" p
      LEFT JOIN "media_assets" m ON m."id" = p."cover_media_id"
-     WHERE p."status" = 'published'
+     ${publishedOnly ? "WHERE p.\"status\" = 'published'" : ''}
      ORDER BY p."depth", p."sort_order", p."name"`,
   ).all<Record<string, unknown>>();
 
@@ -144,6 +147,7 @@ export const mapPlaces: Handler = async (context: RequestContext) => {
     slug: row['slug'],
     name: row['name'],
     kind: row['kind'],
+    status: row['status'],
     description: row['description'],
     known_for: row['known_for'],
     latitude: row['latitude'],
@@ -163,9 +167,9 @@ export const mapPlaces: Handler = async (context: RequestContext) => {
       unplaced_count: rows.length - placed.length,
       bounds,
     },
-    { headers: publicCacheHeaders(300) },
+    { headers: publishedOnly ? publicCacheHeaders(300) : NO_STORE_HEADERS },
   );
-};
+}
 
 /**
  * `POST /api/editorial/places/:id/coordinates`
@@ -179,11 +183,14 @@ export const setPlaceCoordinates: Handler = async (context: RequestContext) => {
   const id = context.params['id'] ?? '';
 
   const place = await context.env.DB.prepare(
-    `SELECT "id", "name" FROM "places" WHERE "id" = ? LIMIT 1`,
-  ).bind(id).first<{ id: string; name: string }>();
+    `SELECT * FROM "places" WHERE "id" = ? LIMIT 1`,
+  ).bind(id).first<Record<string, unknown> & { id: string; name: string; latitude: number | null; longitude: number | null }>();
   if (!place) throw new NotFoundError('That place could not be found.');
 
   const body = await readJsonBody(context.request);
+  if ('previous_latitude' in body && (body['previous_latitude'] !== place.latitude || body['previous_longitude'] !== place.longitude)) {
+    throw new ConflictError('Another editor changed this position. Reload the places list.');
+  }
   const rawLat = body['latitude'];
   const rawLng = body['longitude'];
 
@@ -209,9 +216,19 @@ export const setPlaceCoordinates: Handler = async (context: RequestContext) => {
     }
   }
 
-  await context.env.DB.prepare(
-    `UPDATE "places" SET "latitude" = ?, "longitude" = ?, "updated_at" = ? WHERE "id" = ?`,
-  ).bind(latitude, longitude, nowIso(), id).run();
+  const timestamp = nowIso();
+  const gate = 'EXISTS (SELECT 1 FROM places WHERE id = ? AND latitude IS ? AND longitude IS ?)';
+  const changed = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `INSERT INTO content_versions (id, resource_type, resource_id, version_number, snapshot, changed_fields, change_summary, status_at_time, changed_by, changed_by_name, created_at)
+       SELECT ?, 'places', ?, COALESCE((SELECT MAX(version_number) FROM content_versions WHERE resource_type = 'places' AND resource_id = ?), 0) + 1,
+         ?, ?, 'Map position changed', ?, ?, ?, ? WHERE ${gate}`,
+    ).bind(newId(), id, id, JSON.stringify(place), JSON.stringify(diffRecords(place, { latitude, longitude })), place['status'], actor.id, actor.displayName, timestamp, id, place.latitude, place.longitude),
+    context.env.DB.prepare(
+      `UPDATE places SET latitude = ?, longitude = ?, updated_at = ? WHERE id = ? AND latitude IS ? AND longitude IS ?`,
+    ).bind(latitude, longitude, timestamp, id, place.latitude, place.longitude),
+  ]);
+  if (!changed[1]?.meta.changes) throw new ConflictError('Another editor changed this position. Reload the places list.');
 
   await new AuditRepository(context.env.DB).record({
     actorId: actor.id,

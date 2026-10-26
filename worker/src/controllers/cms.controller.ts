@@ -1,11 +1,15 @@
 import type { RequestContext } from '../types/api';
-import { CmsRepository } from '../repositories/cms.repository';
+import { CmsRepository, type HeroSlideRecord } from '../repositories/cms.repository';
 import { EditorialRepository } from '../repositories/editorial.repository';
 import { AuditRepository, AUDIT_ACTIONS } from '../repositories/audit.repository';
 import { CONTENT_STATUS } from '../types/models';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
 import { readJsonBody, Validator } from '../utils/validation';
 import { json, publicCacheHeaders, NO_STORE_HEADERS } from '../utils/responses';
+import { withLayoutDrafts, saveLayoutDraft, changeLayoutDraft, layoutKind } from '../services/layout-drafts';
+import { parsePagination } from '../utils/pagination';
+import { CONTENT_RESOURCES } from '../services/content-registry';
+import { ContentRepository } from '../repositories/content.repository';
 import { publicMediaUrl } from '../utils/files';
 
 /**
@@ -36,18 +40,7 @@ export async function bundle(context: RequestContext): Promise<Response> {
   return json(
     {
       strings,
-      hero: slides.map((slide) => ({
-        slideNumber: slide.slide_number,
-        eyebrow: slide.eyebrow,
-        title: slide.title,
-        description: slide.description,
-        imageUrl: null as string | null,
-        imageAltText: slide.image_alt_text,
-        primaryButtonLabel: slide.primary_button_label,
-        primaryButtonPath: slide.primary_button_path,
-        secondaryButtonLabel: slide.secondary_button_label,
-        secondaryButtonPath: slide.secondary_button_path,
-      })),
+      hero: await resolveHeroSlides(context, slides),
       navigation: {
         primary: navigation.filter((item) => item.menu === 'primary').map(toNavItem),
         footer: navigation.filter((item) => item.menu === 'footer').map(toNavItem),
@@ -77,48 +70,28 @@ function toNavItem(item: {
 /**
  * `GET /api/cms/hero` — the carousel with its images resolved.
  *
- * Separate from the bundle because a slide's image has to be joined to its
- * media record to produce a URL, and the bundle is on the critical path.
+ * Kept as a compatible focused endpoint; the bundle resolves these images too.
  */
 export async function heroCarousel(context: RequestContext): Promise<Response> {
   const cms = new CmsRepository(context.env.DB);
   const slides = await cms.heroSlides(true);
 
-  const withImages = await Promise.all(
-    slides.map(async (slide) => {
-      let imageUrl: string | null = null;
+  return json({ slides: await resolveHeroSlides(context, slides) }, { headers: publicCacheHeaders(300) });
+}
 
-      // An image slot is empty until the Media Team attaches an approved
-      // photograph. The client renders a branded panel in that case rather than
-      // a broken image, so the homepage is presentable from day one.
-      if (slide.image_media_id) {
-        const media = await context.env.DB.prepare(
-          'SELECT "storage_key", "status" FROM "media_assets" WHERE "id" = ? LIMIT 1',
-        )
-          .bind(slide.image_media_id)
-          .first<{ storage_key: string; status: string }>();
-
-        if (media && media.status === CONTENT_STATUS.PUBLISHED) {
-          imageUrl = publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, media.storage_key);
-        }
-      }
-
-      return {
-        slideNumber: slide.slide_number,
-        eyebrow: slide.eyebrow,
-        title: slide.title,
-        description: slide.description,
-        imageUrl,
-        imageAltText: slide.image_alt_text,
-        primaryButtonLabel: slide.primary_button_label,
-        primaryButtonPath: slide.primary_button_path,
-        secondaryButtonLabel: slide.secondary_button_label,
-        secondaryButtonPath: slide.secondary_button_path,
-      };
-    }),
-  );
-
-  return json({ slides: withImages }, { headers: publicCacheHeaders(300) });
+async function resolveHeroSlides(context: RequestContext, slides: HeroSlideRecord[]): Promise<Record<string, unknown>[]> {
+  return Promise.all(slides.map(async slide => {
+    const media = slide.image_media_id ? await context.env.DB.prepare(
+      'SELECT storage_key FROM media_assets WHERE id = ? AND status = \'published\'',
+    ).bind(slide.image_media_id).first<{ storage_key: string }>() : null;
+    return {
+      slideNumber: slide.slide_number, eyebrow: slide.eyebrow, title: slide.title, description: slide.description,
+      imageUrl: media ? publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, media.storage_key) : null,
+      imageAltText: slide.image_alt_text,
+      primaryButtonLabel: slide.primary_button_label, primaryButtonPath: slide.primary_button_path,
+      secondaryButtonLabel: slide.secondary_button_label, secondaryButtonPath: slide.secondary_button_path,
+    };
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +233,15 @@ export async function publishString(context: RequestContext): Promise<Response> 
 export async function editorialHero(context: RequestContext): Promise<Response> {
   const cms = new CmsRepository(context.env.DB);
   const slides = await cms.heroSlides(false);
-  return json({ slides }, { headers: NO_STORE_HEADERS });
+  const staged = await withLayoutDrafts(context.env.DB, 'hero', slides as unknown as Record<string, unknown>[]);
+  const enriched = await Promise.all(staged.map(async slide => {
+    const draft = slide['draft'] as { values: Record<string, unknown> | null };
+    const imageId = draft.values && 'image_media_id' in draft.values ? draft.values['image_media_id'] : slide['image_media_id'];
+    const media = imageId ? await context.env.DB.prepare('SELECT storage_key FROM media_assets WHERE id = ? AND status = \'published\'')
+      .bind(imageId).first<{ storage_key: string }>() : null;
+    return { ...slide, image_url: media ? publicMediaUrl(context.env.PUBLIC_MEDIA_BASE_URL, media.storage_key) : null };
+  }));
+  return json({ slides: enriched }, { headers: NO_STORE_HEADERS });
 }
 
 /** Columns an editor may set on a hero slide. */
@@ -279,7 +260,7 @@ const HERO_WRITABLE = [
 
 /** `PUT /api/editorial/hero/:slide` */
 export async function updateHeroSlide(context: RequestContext): Promise<Response> {
-  const actor = requireActor(context);
+  requireActor(context);
   const slideNumber = Number(context.params['slide'] ?? '0');
   if (!Number.isInteger(slideNumber) || slideNumber < 1 || slideNumber > 5) {
     throw new BadRequestError('The hero carousel has exactly five slides, numbered 1 to 5.');
@@ -310,22 +291,15 @@ export async function updateHeroSlide(context: RequestContext): Promise<Response
   }
   if (Object.keys(values).length === 0) throw new BadRequestError('No changes were supplied.');
 
-  const cms = new CmsRepository(context.env.DB);
-  const changed = await cms.updateHeroSlide(slideNumber, values, actor.id);
-  if (changed === 0) throw new NotFoundError('That hero slide was not found.');
-
-  await audit(context, AUDIT_ACTIONS.CONTENT_UPDATED, 'hero_slide', String(slideNumber), {
-    fields: Object.keys(values),
-  });
-
-  return json({ slideNumber, updated: Object.keys(values) }, { headers: NO_STORE_HEADERS });
+  const revision = await saveLayoutDraft(context, 'hero', String(slideNumber), values, body);
+  return json({ slideNumber, revision, status: 'draft' }, { headers: NO_STORE_HEADERS });
 }
 
 /** `GET /api/editorial/navigation` */
 export async function editorialNavigation(context: RequestContext): Promise<Response> {
   const cms = new CmsRepository(context.env.DB);
   const items = await cms.navigation(context.query.get('menu'), false);
-  return json({ items }, { headers: NO_STORE_HEADERS });
+  return json({ items: await withLayoutDrafts(context.env.DB, 'navigation', items as unknown as Record<string, unknown>[]) }, { headers: NO_STORE_HEADERS });
 }
 
 /** `PATCH /api/editorial/navigation/:id` */
@@ -345,15 +319,19 @@ export async function updateNavigationItem(context: RequestContext): Promise<Res
 
   if (Object.keys(validated).length === 0) throw new BadRequestError('No changes were supplied.');
 
-  const cms = new CmsRepository(context.env.DB);
-  const changed = await cms.updateNavigationItem(id, validated);
-  if (changed === 0) throw new NotFoundError('That navigation item was not found.');
+  const revision = await saveLayoutDraft(context, 'navigation', id, validated, body);
+  return json({ id, revision, status: 'draft' }, { headers: NO_STORE_HEADERS });
+}
 
-  await audit(context, AUDIT_ACTIONS.CONTENT_UPDATED, 'navigation_item', id, {
-    fields: Object.keys(validated),
-  });
-
-  return json({ id, updated: Object.keys(validated) }, { headers: NO_STORE_HEADERS });
+/** Workflow actions for staged carousel/menu changes. */
+export async function layoutDraftAction(context: RequestContext): Promise<Response> {
+  requireActor(context);
+  const kind = layoutKind(context.params['kind'] ?? '');
+  const id = context.params['id'] ?? '';
+  const action = context.params['action'] ?? '';
+  const body = await readJsonBody(context.request);
+  await changeLayoutDraft(context, kind, id, action, body);
+  return json({ id, action }, { headers: NO_STORE_HEADERS });
 }
 
 // --- Sources ---------------------------------------------------------------
@@ -404,10 +382,11 @@ export async function contributorsForResource(context: RequestContext): Promise<
 /** `GET /api/editorial/sources` */
 export async function listSources(context: RequestContext): Promise<Response> {
   const repository = new EditorialRepository(context.env.DB);
+  const { perPage, offset } = parsePagination(context.query);
   const { items, total } = await repository.listSources({
     search: context.query.get('q'),
-    limit: 100,
-    offset: 0,
+    limit: perPage,
+    offset,
   });
   return json({ sources: items, total }, { headers: NO_STORE_HEADERS });
 }
@@ -460,6 +439,15 @@ export async function attachSource(context: RequestContext): Promise<Response> {
     .validated();
 
   const repository = new EditorialRepository(context.env.DB);
+  const resource = CONTENT_RESOURCES[validated['resource_type'] as string];
+  if (!resource) throw new BadRequestError('Choose an archive content type.');
+  const record = await new ContentRepository(context.env.DB, resource)
+    .findById(validated['resource_id'] as string, null);
+  if (!record) throw new NotFoundError('That archive record was not found.');
+  const source = await context.env.DB.prepare('SELECT "id" FROM "sources" WHERE "id" = ?')
+    .bind(validated['source_id']).first();
+  if (!source) throw new NotFoundError('That source was not found.');
+
   const id = await repository.attachSource({
     resourceType: validated['resource_type'] as string,
     resourceId: validated['resource_id'] as string,

@@ -91,12 +91,12 @@ class AppScaffold extends StatelessWidget {
 /// degrades to the built-in menu rather than an empty header.
 extension CmsNavigation on CmsController {
   List<NavItem> get primaryNavigationOrFallback {
-    if (primaryNavigation.isEmpty) return fallbackPrimaryNavigation;
+    if (!isLoaded || !isApiReachable) return fallbackPrimaryNavigation;
     return primaryNavigation.map(_toNavItem).toList(growable: false);
   }
 
   List<NavItem> get footerNavigationOrFallback {
-    if (footerNavigation.isEmpty) return fallbackFooterNavigation;
+    if (!isLoaded || !isApiReachable) return fallbackFooterNavigation;
     return footerNavigation.map(_toNavItem).toList(growable: false);
   }
 

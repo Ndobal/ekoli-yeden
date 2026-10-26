@@ -37,6 +37,13 @@ class SiteSettingsController extends ChangeNotifier {
     }
   }
 
+  void applySavedValues(Map<String, dynamic> values) {
+    _settings = SiteSettings(values);
+    _loaded = true;
+    _apiReachable = true;
+    notifyListeners();
+  }
+
   Future<void> refresh() async {
     _loaded = false;
     notifyListeners();

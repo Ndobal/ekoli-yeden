@@ -18,6 +18,8 @@ import '../../services/api/api_response.dart';
 import '../../models/content_record.dart';
 import '../../services/auth/auth_controller.dart';
 import '../workspace/content_editor.dart';
+import '../workspace/source_tools.dart';
+import '../workspace/version_history_dialog.dart';
 import 'editorial_shell.dart';
 
 /// EDIT THE WEBSITE'S TEXT.
@@ -395,6 +397,7 @@ class EditorialContentPage extends StatefulWidget {
 
 class _EditorialContentPageState extends State<EditorialContentPage> {
   int _reloadToken = 0;
+  int _page = 1;
   String? _status;
 
   void _reload() => setState(() => _reloadToken += 1);
@@ -443,7 +446,7 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
           FilledButton.icon(
             onPressed: _openEditor,
             icon: const Icon(Icons.add, size: 18),
-            label: Text('New ${widget.title.toLowerCase()}'),
+            label: Text(widget.resource == 'community' ? 'New project' : 'New ${widget.title.toLowerCase()}'),
           ),
       ],
       child: Column(
@@ -456,14 +459,14 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
               FilterChip(
                 label: const Text('All'),
                 selected: _status == null,
-                onSelected: (_) => setState(() => _status = null),
+                onSelected: (_) => setState(() { _status = null; _page = 1; }),
               ),
               ...ContentStatus.all.map(
                 (String status) => FilterChip(
                   label: Text(ContentStatus.label(status)),
                   selected: _status == status,
                   onSelected: (bool selected) =>
-                      setState(() => _status = selected ? status : null),
+                      setState(() { _status = selected ? status : null; _page = 1; }),
                 ),
               ),
             ],
@@ -471,8 +474,8 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
           const Gap.xl(),
 
           AsyncContent<PaginatedResult<ContentRecord>>(
-            key: ValueKey<String>('${widget.resource}:$_status:$_reloadToken'),
-            load: () => repository.adminList(perPage: 60, status: _status),
+            key: ValueKey<String>('${widget.resource}:$_status:$_page:$_reloadToken'),
+            load: () => repository.adminList(page: _page, perPage: 60, status: _status),
             loadingMessage: 'Loading ${widget.title.toLowerCase()}…',
             isEmpty: (PaginatedResult<ContentRecord> result) => result.isEmpty,
             emptyBuilder: (BuildContext context) => Column(
@@ -492,6 +495,12 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
             builder: (BuildContext context, PaginatedResult<ContentRecord> result) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                if (result.totalPages > 1)
+                  Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: <Widget>[
+                    TextButton(onPressed: _page > 1 ? () => setState(() => _page--) : null, child: const Text('Previous')),
+                    Text('Page $_page of ${result.totalPages}'),
+                    TextButton(onPressed: result.hasMore ? () => setState(() => _page++) : null, child: const Text('Next')),
+                  ]),
                 Text(
                   '${result.total} record${result.total == 1 ? '' : 's'}',
                   style: theme.textTheme.bodySmall,
@@ -551,6 +560,14 @@ class _EditorialContentPageState extends State<EditorialContentPage> {
                                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                                 ),
                               ),
+                              if (auth.canAny(<String>['sources:read', 'sources.manage', 'sources.read', 'content.manage']))
+                                OutlinedButton.icon(
+                                  onPressed: () => showDialog<void>(context: context, builder: (_) => RecordSourcesDialog(resource: widget.resource, recordId: record.id)),
+                                  icon: const Icon(Icons.menu_book_outlined, size: 16),
+                                  label: const Text('Sources'),
+                                ),
+                              if (auth.canAny(<String>['versions:read', 'content.read', 'content.edit', 'content.manage']))
+                                OutlinedButton.icon(onPressed: () => showDialog<void>(context: context, builder: (_) => VersionHistoryDialog(resource: widget.resource, recordId: record.id)), icon: const Icon(Icons.history, size: 16), label: const Text('History')),
                               if (record.status == ContentStatus.draft &&
                                   (auth.can('content.submit') || auth.can('*')))
                                 _WorkflowButton(

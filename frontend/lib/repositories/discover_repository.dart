@@ -52,13 +52,15 @@ class DiscoverRepository {
     return MapOverview.fromJson(data);
   }
 
+  Future<MapOverview> editorialMap() async => MapOverview.fromJson(await _api.get('/api/editorial/map/places'));
+
   /// Records where a place stands, or clears a position recorded in error.
   ///
   /// Pass nulls for both to clear. Editorial only — the Worker checks.
-  Future<void> setCoordinates(String placeId, {double? latitude, double? longitude}) {
+  Future<void> setCoordinates(String placeId, {double? latitude, double? longitude, double? previousLatitude, double? previousLongitude}) {
     return _api.post(
       '/api/editorial/places/$placeId/coordinates',
-      body: <String, dynamic>{'latitude': latitude, 'longitude': longitude},
+      body: <String, dynamic>{'latitude': latitude, 'longitude': longitude, 'previous_latitude': previousLatitude, 'previous_longitude': previousLongitude},
     );
   }
 
